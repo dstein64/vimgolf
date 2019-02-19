@@ -6,6 +6,10 @@ import tempfile
 
 from vimgolf.keys import IGNORED_KEYSTROKES, get_keycode_repr, parse_keycodes
 
+version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
+with open(version_txt, 'r') as f:
+    __version__ = f.read().strip()
+
 STATUS_SUCCESS = 0
 STATUS_FAILURE = 1
 
@@ -18,7 +22,8 @@ HELP_MESSAGE = (
     '  vimgolf [help]                # display this help and exit\n'
     '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
     '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
-    '  vimgolf setup [API_KEY]       # configure your VimGolf credentials'
+    '  vimgolf setup [API_KEY]       # configure your VimGolf credentials\n'
+    '  vimgolf version               # display the version number'
 )
 
 
@@ -131,6 +136,9 @@ def main(argv=sys.argv):
         else:
             api_key = argv[2] if len(argv) == 2 else None
             status = setup(api_key)
+    elif command == 'version':
+        write(__version__)
+        status = STATUS_SUCCESS
     else:
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
         status = STATUS_FAILURE
