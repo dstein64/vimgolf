@@ -1,15 +1,13 @@
 """Maps keys recorded by vim to a printable representation"""
 
-# This file has to be updated when vim changes internal representation.
-# E.g., https://github.com/igrigorik/vimgolf/pull/188
-
-# There are possibly ways to query vim to convert internal keycode
-# representations to a human-readable format.
-# E.g., https://github.com/vim/vim/issues/1810
-
-
 def to_bytes(x):
+    """Convert and integer to bytes."""
     return x.to_bytes(2, 'big')
+
+
+def to_int(x):
+    """Convert bytes to an integer."""
+    return int(x.hex(), 16)
 
 
 # Vim records key presses using 1) a single byte or 2) a 0x80 byte
@@ -18,8 +16,8 @@ def to_bytes(x):
 # represented with two bytes.
 def parse_keycodes(raw_keys):
     """
-    Parse list of parsed keypress bytes from raw keypress
-    representation saved by vim's -w.
+    Parse list of keypress bytes from raw keypress representation saved
+    by vim's -w.
     """
     keycodes = []
     tmp = list(reversed(raw_keys))
@@ -38,9 +36,6 @@ def parse_keycodes(raw_keys):
 # keystrokes that should not impact score (e.g., window focus)
 IGNORED_KEYSTROKES = {
     b'\xfd\x35', # KE_IGNORE
-    b'\xfd\x5e', # 7.2 compat "(I think?)"
-    b'\xfd\x60', # 7.2 Focus Gained compat
-    b'\xfd\x61', # Focus Gained (GVIM) (>7.4.1433)
     b'\xfd\x62', # Focus Gained (GVIM)
     b'\xfd\x63', # Focus Lost (GVIM)
 }
@@ -62,11 +57,6 @@ _KEYCODE_REPR_LOOKUP[to_bytes(13)] = '<CR>'
 _KEYCODE_REPR_LOOKUP[to_bytes(27)] = '<Esc>'
 _KEYCODE_REPR_LOOKUP[to_bytes(127)] = '<Del>'
 
-# Double byte keys are from vimgolf's keylog.rb.
-# Their source was:
-#   1) :h terminal-options
-#      (in particular, see :h terminal-key-codes)
-#   2) vim sources: keymap.h, and misc2.c
 _KEYCODE_REPR_LOOKUP.update({
     b'k1': '<F1>',
     b'k2': '<F2>',
@@ -87,9 +77,7 @@ _KEYCODE_REPR_LOOKUP.update({
     b'F7': '<F17>',
     b'F8': '<F18>',
     b'F9': '<F19>',
-})
 
-_KEYCODE_REPR_LOOKUP.update({
     b'%1': '<Help>',
     b'&8': '<Undo>',
     b'#2': '<S-Home>',
@@ -114,9 +102,7 @@ _KEYCODE_REPR_LOOKUP.update({
     b'KJ': '<k7>',
     b'KK': '<k8>',
     b'KL': '<k9>',
-})
 
-_KEYCODE_REPR_LOOKUP.update({
     b'kP': '<PageUp>',
     b'kN': '<PageDown>',
     b'kh': '<Home>',
@@ -124,29 +110,22 @@ _KEYCODE_REPR_LOOKUP.update({
     b'kI': '<Insert>',
     b'kD': '<Del>',
     b'kb': '<BS>',
-})
 
-_KEYCODE_REPR_LOOKUP.update({
     b'ku': '<Up>',
     b'kd': '<Down>',
     b'kl': '<Left>',
     b'kr': '<Right>',
     b'#4': '<S-Left>',
     b'%i': '<S-Right>',
-})
 
-_KEYCODE_REPR_LOOKUP.update({
     b'kB': '<S-Tab>',
     b'\xffX': '<C-@>',
-})
 
-_KEYCODE_REPR_LOOKUP.update({
-    b'\xfeX': '<0x80>',  # This is how you escape literal 0x80
-})
+    # Escaped literal 0x80
+    b'\xfeX': '<0x80>',
 
-# "These rarely-used modifiers should be combined with the next
-#  stroke (like <S-Space>), but let's put them here for now"
-_KEYCODE_REPR_LOOKUP.update({
+    # "These rarely-used modifiers should be combined with the next
+    #  stroke (like <S-Space>), but let's put them here for now"
     b'\xfc\x02': '<S->',
     b'\xfc\x04': '<C->',
     b'\xfc\x06': '<C-S->',
@@ -162,12 +141,7 @@ _KEYCODE_REPR_LOOKUP.update({
     b'\xfc\x1a': '<M-A-S->',
     b'\xfc\x1c': '<M-C-A>',
     b'\xfc\x1e': '<M-C-A-S->',
-})
 
-# KS_EXTRA keycodes (starting with 0x80 0xfd) are defined by an enum in
-# Vim's keymap.h.
-# Changes to vim source code require changes here.
-_KEYCODE_REPR_LOOKUP.update({
     b'\xfd\x04': '<S-Up>',
     b'\xfd\x05': '<S-Down>',
     b'\xfd\x06': '<S-F1>',
@@ -217,70 +191,17 @@ _KEYCODE_REPR_LOOKUP.update({
     b'\xfd\x32': '<RightMouse>',
     b'\xfd\x33': '<RightDrag>',
     b'\xfd\x34': '<RightRelease>',
-    b'\xfd\x35': '<KE_IGNORE>',
-    b'\xfd\x36': '<KE_TAB>',
-    b'\xfd\x37': '<KE_S_TAB_OLD>',
-})
 
-# Vim 7.4.1433 removed KE_SNIFF. This is adjusted for in get_keycode_repr.
-# TODO: adjust keycodes in the dictionary to reflect this removal.
-_KEYCODE_REPR_LOOKUP.update({
-    b'\xfd\x38': '<KE_SNIFF>',
-    b'\xfd\x39': '<KE_XF1>',
-    b'\xfd\x3a': '<KE_XF2>',
-    b'\xfd\x3b': '<KE_XF3>',
-    b'\xfd\x3c': '<KE_XF4>',
-    b'\xfd\x3d': '<KE_XEND>',
-    b'\xfd\x3e': '<KE_ZEND>',
-    b'\xfd\x3f': '<KE_XHOME>',
-    b'\xfd\x40': '<KE_ZHOME>',
-    b'\xfd\x41': '<KE_XUP>',
-    b'\xfd\x42': '<KE_XDOWN>',
-    b'\xfd\x43': '<KE_XLEFT>',
-    b'\xfd\x44': '<KE_XRIGHT>',
-    b'\xfd\x45': '<KE_LEFTMOUSE_NM>',
-    b'\xfd\x46': '<KE_LEFTRELEASE_NM>',
-    b'\xfd\x47': '<KE_S_XF1>',
-    b'\xfd\x48': '<KE_S_XF2>',
-    b'\xfd\x49': '<KE_S_XF3>',
-    b'\xfd\x4a': '<KE_S_XF4>',
     b'\xfd\x4b': '<ScrollWheelUp>',
     b'\xfd\x4c': '<ScrollWheelDown>',
-})
-
-# Horizontal scroll wheel support was added in Vim 7.3c.
-_KEYCODE_REPR_LOOKUP.update({
     b'\xfd\x4d': '<ScrollWheelRight>',
     b'\xfd\x4e': '<ScrollWheelLeft>',
     b'\xfd\x4f': '<kInsert>',
     b'\xfd\x50': '<kDel>',
-    b'\xfd\x51': '<0x9b>',        # :help <CSI>
-    b'\xfd\x52': '<KE_SNR>',
-    # b'\xfd\x53': '<KE_PLUG>',   # never used
-    b'\xfd\x53': '<C-Left>',      # 7.2 compat
-    # b'\xfd\x54': '<KE_CMDWIN>', # never used
-    b'\xfd\x54': '<C-Right>',     # 7.2 compat
-    b'\xfd\x55': '<C-Left>',      # 7.2 <C-Home> conflict
-    b'\xfd\x56': '<C-Right>',     # 7.2 <C-End> conflict
+    b'\xfd\x55': '<C-Left>',
+    b'\xfd\x56': '<C-Right>',
     b'\xfd\x57': '<C-Home>',
     b'\xfd\x58': '<C-End>',
-    b'\xfd\x59': '<KE_X1MOUSE>',
-    b'\xfd\x5a': '<KE_X1DRAG>',
-    b'\xfd\x5b': '<KE_X1RELEASE>',
-    b'\xfd\x5c': '<KE_X2MOUSE>',
-    b'\xfd\x5d': '<KE_X2DRAG>',
-    # b'\xfd\x5e': '<KE_X2RELEASE>',
-    b'\xfd\x5e': '<fd-5e>',       # 7.2 compat (I think?)
-    b'\xfd\x5f': '<KE_DROP>',
-    b'\xfd\x60': '<KE_CURSORHOLD>',
-})
-
-# gvim window focus changes are recorded as keystrokes
-_KEYCODE_REPR_LOOKUP.update({
-    b'\xfd\x60': '<FocusGained>',  # 7.2 Focus Gained compat
-    b'\xfd\x61': '<FocusGained>',  # Focus Gained (GVIM) (>7.4.1433)
-    b'\xfd\x62': '<FocusGained>',  # Focus Gained (GVIM)
-    b'\xfd\x63': '<FocusLost>',    # Focus Lost (GVIM)
 })
 
 
@@ -288,6 +209,7 @@ def get_keycode_repr(keycode):
     if keycode in _KEYCODE_REPR_LOOKUP:
         key = _KEYCODE_REPR_LOOKUP[keycode]
     else:
+        # Show unknown keycodes as hex codes surrounded by brackets.
         key = ''.join('\\x{:02x}'.format(x) for x in keycode)
-        key = '<' + key + '>'
+        key = '[' + key + ']'
     return key
