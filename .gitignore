@@ -90,6 +90,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# PyCharm project settings
+.idea
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -102,3 +105,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# macOS Finder metadata
+.DS_Store

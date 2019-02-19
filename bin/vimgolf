@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+
+import sys
+
+import vimgolf
+
+if __name__ == "__main__":
+    sys.exit(vimgolf.vimgolf.main())
