@@ -2,7 +2,7 @@
 
 import sys
 
-import vimgolf
+from vimgolf.vimgolf import main
 
 if __name__ == "__main__":
-    sys.exit(vimgolf.vimgolf.main())
+    sys.exit(main())
