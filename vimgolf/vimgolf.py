@@ -3,6 +3,7 @@ from collections import namedtuple
 import filecmp
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,7 @@ from vimgolf.html_utils import (
 )
 from vimgolf.keys import IGNORED_KEYSTROKES, get_keycode_repr, parse_keycodes
 
+
 version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
 with open(version_txt, 'r') as f:
     __version__ = f.read().strip()
@@ -25,28 +27,30 @@ with open(version_txt, 'r') as f:
 STATUS_SUCCESS = 0
 STATUS_FAILURE = 1
 
+
+# ************************************************************
+# * Configuration and Global Variables
+# ************************************************************
+
 GOLF_HOST = os.environ.get('GOLF_HOST', 'https://www.vimgolf.com')
 GOLF_DIFF = os.environ.get('GOLF_DIFF', 'vim -d -n')
 GOLF_VIM = os.environ.get('GOLF_VIM', 'vim')
 
 USER_AGENT = 'vimgolf'
 
-HELP_MESSAGE = (
-    'Commands:\n'
-    '  vimgolf [help]                # display this help and exit\n'
-    '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
-    '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
-    '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
-    '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
-    '  vimgolf setup [API_KEY]       # configure your VimGolf credentials\n'
-    '  vimgolf version               # display the version number'
-)
+RUBY_CLIENT_VERSION_COMPLIANCE = '0.4.8'
 
-RUBY_CLIENT_COMPLIANCE_VERSION = '0.4.8'
+CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
+os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
+VIMGOLF_API_KEY_FILENAME = 'api_key'
+
+
+# ************************************************************
+# * Utils
+# ************************************************************
 
 HttpResponse = namedtuple('HttpResponse', 'code msg headers body')
-
-Listing = namedtuple('Listing', 'id name n_entries')
 
 
 def http_get(url):
@@ -84,6 +88,30 @@ def write(string, end='\n', stream=None, color=None):
     stream.write(string)
     if end is not None:
         stream.write(str(end))
+
+
+# ************************************************************
+# * Core
+# ************************************************************
+
+def get_api_key():
+    api_key_path = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
+    if not os.path.exists(api_key_path):
+        return None
+    with open(api_key_path, 'r') as f:
+        api_key = f.read()
+        return api_key
+
+
+def set_api_key(api_key):
+    api_key_path = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
+    with open(api_key_path, 'w') as f:
+        f.write(api_key)
+
+
+def show_api_key_help():
+    write('An API key can be obtained from vimgolf.com', color='orange')
+    write('Please run "vimgolf config API_KEY" to set your API key', color='orange')
 
 
 def play(infile, outfile):
@@ -138,6 +166,14 @@ def local(infile, outfile):
 
 
 def put(challenge_id):
+    api_key = get_api_key()
+    if api_key is None:
+        show_api_key_help()
+        # TODO: change this exit to a question of whether to proceed, without upload
+        # capability. Or "press any key to continue without upload capability".
+        # In either case, be sure to set a flag that uploads disabled.
+        exit(1)
+
     # TODO: create copy of infile so it's not destructively modified
     # TODO: check if credentials are set, and if not, issue a warning...
 
@@ -148,7 +184,7 @@ def put(challenge_id):
         # TODO: error message
         return STATUS_FAILURE
     challenge_spec = json.loads(response.body)
-    if challenge_spec['client'] != RUBY_CLIENT_COMPLIANCE_VERSION:
+    if challenge_spec['client'] != RUBY_CLIENT_VERSION_COMPLIANCE:
         # TODO: Issue warning and make sure not to upload.
         # TODO: Also check for fields appropriately... (in/out)
         # TODO: Also use Python versioning library for checking if client version is older or newer...
@@ -163,8 +199,9 @@ def put(challenge_id):
 
 
 def list_(page=None, limit=10):
-    listings = []
+    Listing = namedtuple('Listing', 'id name n_entries')
     try:
+        listings = []
         url = GOLF_HOST
         if page is not None:
             url = urllib.parse.urljoin(GOLF_HOST, '/?page={}'.format(page))
@@ -197,6 +234,8 @@ def list_(page=None, limit=10):
     # TODO: retain the mapping of listing number to ID, so it can be used by put
     # (probably prepended by # for put)
 
+    return STATUS_SUCCESS
+
 
 def show(challenge_id):
     try:
@@ -221,6 +260,7 @@ def show(challenge_id):
     except Exception:
         # TODO: error message
         return STATUS_FAILURE
+
     separator = '-' * 50
     write(separator)
     write('{} ('.format(name), end=None)
@@ -236,11 +276,31 @@ def show(challenge_id):
     write(end_file, end=None)
     write(separator)
 
-
-def setup(api_key=None):
-    # TODO: save credentials
     return STATUS_SUCCESS
 
+
+def config(api_key=None):
+    if api_key is not None and not re.match('[\w\d]{32}', api_key):
+        message = 'Invalid key, please check your key on vimgolf.com'
+        write(message, stream=sys.stderr, color='red')
+        return STATUS_FAILURE
+
+    if api_key:
+        set_api_key(api_key)
+        return STATUS_SUCCESS
+
+    api_key = get_api_key()
+    if api_key:
+        write(api_key)
+    else:
+        show_api_key_help()
+
+    return STATUS_SUCCESS
+
+
+# ************************************************************
+# * Command Line Interface
+# ************************************************************
 
 def main(argv=sys.argv):
     if len(argv) < 2:
@@ -248,8 +308,19 @@ def main(argv=sys.argv):
     else:
         command = argv[1]
 
+    help_message = (
+        'Commands:\n'
+        '  vimgolf [help]                # display this help and exit\n'
+        '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
+        '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
+        '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
+        '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
+        '  vimgolf config [API_KEY]      # configure your VimGolf credentials\n'
+        '  vimgolf version               # display the version number'
+    )
+
     if command == 'help':
-        write(HELP_MESSAGE)
+        write(help_message)
         status = STATUS_SUCCESS
     elif command == 'local':
         if len(argv) != 4:
@@ -287,14 +358,14 @@ def main(argv=sys.argv):
             status = STATUS_FAILURE
         else:
             status = show(argv[2])
-    elif command == 'setup':
+    elif command == 'config':
         if not len(argv) in (2, 3):
-            usage = 'Usage: "vimgolf setup [API_KEY]"'
+            usage = 'Usage: "vimgolf config [API_KEY]"'
             write(usage, stream=sys.stderr, color='red')
             status = STATUS_FAILURE
         else:
             api_key = argv[2] if len(argv) == 3 else None
-            status = setup(api_key)
+            status = config(api_key)
     elif command == 'version':
         write(__version__)
         status = STATUS_SUCCESS

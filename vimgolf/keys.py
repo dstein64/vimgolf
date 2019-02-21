@@ -1,7 +1,7 @@
 """Maps keys recorded by vim to a printable representation"""
 
 def to_bytes(x):
-    """Convert and integer to bytes."""
+    """Convert an integer to bytes."""
     return x.to_bytes(2, 'big')
 
 

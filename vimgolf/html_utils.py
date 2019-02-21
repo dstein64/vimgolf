@@ -4,14 +4,6 @@ class Node:
     def __init__(self):
         self.parent = None
 
-    def get_next_sibling(self):
-        if self.parent:
-            siblings = self.parent.children
-            for idx, node in enumerate(siblings):
-                if node is self and idx + 1 < len(siblings):
-                    return siblings[idx + 1]
-        return None
-
 
 class Element(Node):
     def __init__(self, tag, attrs):
