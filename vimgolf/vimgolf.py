@@ -1,9 +1,21 @@
+from cgi import parse_header
+from collections import namedtuple
 import filecmp
+import json
 import os
 import subprocess
 import sys
 import tempfile
+import urllib.parse
+import urllib.request
 
+from vimgolf.html_utils import (
+    get_elements_by_classname,
+    get_element_by_id,
+    get_elements_by_tagname,
+    parse_html,
+    TextNode
+)
 from vimgolf.keys import IGNORED_KEYSTROKES, get_keycode_repr, parse_keycodes
 
 version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
@@ -17,14 +29,43 @@ GOLF_HOST = os.environ.get('GOLF_HOST', 'https://www.vimgolf.com')
 GOLF_DIFF = os.environ.get('GOLF_DIFF', 'vim -d -n')
 GOLF_VIM = os.environ.get('GOLF_VIM', 'vim')
 
+USER_AGENT = 'vimgolf'
+
 HELP_MESSAGE = (
     'Commands:\n'
     '  vimgolf [help]                # display this help and exit\n'
     '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
     '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
+    '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
+    '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
     '  vimgolf setup [API_KEY]       # configure your VimGolf credentials\n'
     '  vimgolf version               # display the version number'
 )
+
+RUBY_CLIENT_COMPLIANCE_VERSION = '0.4.8'
+
+HttpResponse = namedtuple('HttpResponse', 'code msg headers body')
+
+Listing = namedtuple('Listing', 'id name n_entries')
+
+
+def http_get(url):
+    request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+    response = urllib.request.urlopen(request)
+    try:
+        # TODO: get rid of cgi dependency. do this manually
+        charset = parse_header(response.getheader('Content-Type'))[1]['charset']
+    except Exception:
+        charset = 'utf-8'
+    body = response.read().decode(charset)
+    output = HttpResponse(
+        code=response.code, msg=response.msg, headers=response.getheaders(), body=body)
+    return output
+
+
+def join_lines(string):
+    lines = [line.strip() for line in string.split('\n') if line]
+    return ' '.join(lines)
 
 
 def write(string, end='\n', stream=None, color=None):
@@ -39,7 +80,7 @@ def write(string, end='\n', stream=None, color=None):
     if stream is None:
         stream = sys.stdout
     if color and hasattr(stream, 'isatty') and stream.isatty():
-        string = color_lookup[color] + string + end_color
+        string = color_lookup[color] + str(string) + end_color
     stream.write(string)
     if end is not None:
         stream.write(str(end))
@@ -99,10 +140,105 @@ def local(infile, outfile):
 def put(challenge_id):
     # TODO: create copy of infile so it's not destructively modified
     # TODO: check if credentials are set, and if not, issue a warning...
+
+    url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}.json'.format(challenge_id))
+    try:
+        response = http_get(url)
+    except  Exception:
+        # TODO: error message
+        return STATUS_FAILURE
+    challenge_spec = json.loads(response.body)
+    if challenge_spec['client'] != RUBY_CLIENT_COMPLIANCE_VERSION:
+        # TODO: Issue warning and make sure not to upload.
+        # TODO: Also check for fields appropriately... (in/out)
+        # TODO: Also use Python versioning library for checking if client version is older or newer...
+        # TODO: Also check that 'client' exists. If it doesn't, then not compliant. May also want to check
+        #       for response type json.
+        pass
+
+    # TODO: play() should take strings as input and construct
+    #       temporary files...
+
     return STATUS_SUCCESS
 
 
+def list_(page=None, limit=10):
+    listings = []
+    try:
+        url = GOLF_HOST
+        if page is not None:
+            url = urllib.parse.urljoin(GOLF_HOST, '/?page={}'.format(page))
+        response = http_get(url)
+        nodes = parse_html(response.body)
+        challenge_elements = get_elements_by_classname(nodes, 'challenge')
+        for element in challenge_elements:
+            id_, name, n_entries = None, None, None
+            anchor = get_elements_by_tagname(element.children, 'a')[0]
+            href = anchor.get_attr('href')
+            id_ = href.split('/')[-1]
+            name = anchor.children[0].data
+            for child in element.children:
+                if isinstance(child, TextNode) and 'entries' in child.data:
+                    n_entries = int([x for x in child.data.split() if x.isdigit()][0])
+                    break
+            listing = Listing(id=id_, name=name, n_entries=n_entries)
+            listings.append(listing)
+    except Exception:
+        # TODO: error message
+        return STATUS_FAILURE
+
+    for idx, listing in enumerate(listings):
+        if idx >= limit: break
+        write('{}. '.format(idx + 1), end=None)
+        write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
+        write(listing.id, color='orange', end=None)
+        write(')')
+
+    # TODO: retain the mapping of listing number to ID, so it can be used by put
+    # (probably prepended by # for put)
+
+
+def show(challenge_id):
+    try:
+        api_url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}.json'.format(challenge_id))
+        api_response = http_get(api_url)
+        challenge_spec = json.loads(api_response.body)
+        start_file = challenge_spec['in']['data']
+        if not start_file.endswith('\n'):
+            start_file += '\n'
+        end_file = challenge_spec['out']['data']
+        if not end_file.endswith('\n'):
+            end_file += '\n'
+        page_url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}'.format(challenge_id))
+        page_response = http_get(page_url)
+        nodes = parse_html(page_response.body)
+        content_element = get_element_by_id(nodes, 'content')
+        grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
+        h3_element = get_elements_by_tagname(grid_7_element.children, 'h3')[0]
+        name = join_lines(h3_element.children[0].children[0].data)
+        p_element = get_elements_by_tagname(grid_7_element.children, 'p')[0]
+        description = join_lines(p_element.children[0].data)
+    except Exception:
+        # TODO: error message
+        return STATUS_FAILURE
+    separator = '-' * 50
+    write(separator)
+    write('{} ('.format(name), end=None)
+    write(challenge_id, color='orange', end=None)
+    write(')')
+    write(separator)
+    write(description)
+    write(separator)
+    write('Start File', color='green')
+    write(start_file, end=None)
+    write(separator)
+    write('End File', color='green')
+    write(end_file, end=None)
+    write(separator)
+
+
 def setup(api_key=None):
+    # TODO: save credentials
     return STATUS_SUCCESS
 
 
@@ -111,6 +247,7 @@ def main(argv=sys.argv):
         command = 'help'
     else:
         command = argv[1]
+
     if command == 'help':
         write(HELP_MESSAGE)
         status = STATUS_SUCCESS
@@ -128,13 +265,35 @@ def main(argv=sys.argv):
             status = STATUS_FAILURE
         else:
             status = put(argv[2])
+    elif command == 'list':
+        if not len(argv) in (2, 3):
+            usage = 'Usage: "vimgolf list [PAGE]"'
+            write(usage, stream=sys.stderr, color='red')
+            status = STATUS_FAILURE
+        else:
+            kwargs = {}
+            page_and_limit = argv[2] if len(argv) == 3 else ''
+            parts = page_and_limit.split(':')
+            try:
+                if len(parts) > 0 and parts[0]: kwargs['page'] = int(parts[0])
+                if len(parts) > 1: kwargs['limit'] = int(parts[1])
+            except Exception:
+                pass
+            status = list_(**kwargs)
+    elif command == 'show':
+        if len(argv) != 3:
+            usage = 'Usage: "vimgolf show CHALLENGE_ID"'
+            write(usage, stream=sys.stderr, color='red')
+            status = STATUS_FAILURE
+        else:
+            status = show(argv[2])
     elif command == 'setup':
         if not len(argv) in (2, 3):
             usage = 'Usage: "vimgolf setup [API_KEY]"'
             write(usage, stream=sys.stderr, color='red')
             status = STATUS_FAILURE
         else:
-            api_key = argv[2] if len(argv) == 2 else None
+            api_key = argv[2] if len(argv) == 3 else None
             status = setup(api_key)
     elif command == 'version':
         write(__version__)
@@ -142,6 +301,7 @@ def main(argv=sys.argv):
     else:
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
         status = STATUS_FAILURE
+
     return status
 
 

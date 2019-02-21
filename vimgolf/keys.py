@@ -12,8 +12,8 @@ def to_int(x):
 
 # Vim records key presses using 1) a single byte or 2) a 0x80 byte
 # followed by two bytes. Parse the single-bytes and double-bytes.
-# For the returned list, all values, including the single-bytes, are
-# represented with two bytes.
+# For the returned list, all values are represented with two bytes
+# (single bytes are padded).
 def parse_keycodes(raw_keys):
     """
     Parse list of keypress bytes from raw keypress representation saved
