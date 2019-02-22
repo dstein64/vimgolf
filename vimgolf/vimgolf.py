@@ -9,7 +9,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-from vimgolf.html_utils import (
+from vimgolf.html import (
     get_elements_by_classname,
     get_element_by_id,
     get_elements_by_tagname,
@@ -97,7 +97,7 @@ def write(string, end='\n', stream=None, color=None):
 
 
 def format_(string):
-    """dos2unix and add newline to end."""
+    """dos2unix and add newline to end if missing."""
     string = string.replace('\r\n', '\n').replace('\r', '\n')
     if not string.endswith('\n'):
         string = string + '\n'
@@ -274,7 +274,7 @@ def play(challenge, workspace):
                 diff_args = GOLF_DIFF.split() + [infile, outfile]
                 subprocess.run(diff_args)
             elif selection == 'w':
-                # TODO: upload result
+                # TODO: upload result and print message on success
                 pass
             else:
                 break
@@ -449,7 +449,7 @@ def show(challenge_id):
 
 
 def config(api_key=None):
-    if not validate_api_key(api_key):
+    if api_key is not None and not validate_api_key(api_key):
         show_api_key_error()
         return STATUS_FAILURE
 
