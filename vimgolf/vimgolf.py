@@ -39,10 +39,17 @@ USER_AGENT = 'vimgolf'
 
 RUBY_CLIENT_VERSION_COMPLIANCE = '0.4.8'
 
-CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+USER_HOME = os.path.expanduser('~')
+
+CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
 VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
 VIMGOLF_API_KEY_FILENAME = 'api_key'
+
+DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(USER_HOME, '.local', 'share'))
+VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
+os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
+VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
 
 
 # ************************************************************
@@ -108,12 +115,12 @@ def input_loop(prompt, strip=True, required=True):
             if strip:
                 selection = selection.strip()
         except EOFError:
-            sys.exit(1)
+            sys.exit(STATUS_FAILURE)
         except KeyboardInterrupt:
             # With readline, stdin is flushed after a KeyboarInterrupt.
             # Otherwise, exit.
             if 'readline' not in sys.modules:
-                sys.exit(1)
+                sys.exit(STATUS_FAILURE)
             write('')
             continue
         if required and not selection:
@@ -121,9 +128,23 @@ def input_loop(prompt, strip=True, required=True):
         break
     return selection
 
+
 # ************************************************************
 # * Core
 # ************************************************************
+
+def validate_challenge_id(challenge_id):
+    return challenge_id is not None and re.match(r'[\w\d]{24}', challenge_id)
+
+
+def show_challenge_id_error():
+    write('Invalid challenge ID', stream=sys.stderr, color='red')
+    write('Please check the ID on vimgolf.com', stream=sys.stderr, color='red')
+
+
+def validate_api_key(api_key):
+    return api_key is not None and re.match(r'[\w\d]{32}', api_key)
+
 
 def get_api_key():
     api_key_path = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
@@ -143,6 +164,32 @@ def set_api_key(api_key):
 def show_api_key_help():
     write('An API key can be obtained from vimgolf.com', color='orange')
     write('Please run "vimgolf config API_KEY" to set your API key', color='orange')
+
+
+def show_api_key_error():
+    write('Invalid API key', stream=sys.stderr, color='red')
+    write('Please check your API key on vimgolf.com', stream=sys.stderr, color='red')
+
+
+def get_id_lookup():
+    id_lookup_path = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
+    id_lookup = {}
+    if os.path.exists(id_lookup_path):
+        with open(id_lookup_path, 'r') as f:
+            id_lookup = json.load(f)
+    return id_lookup
+
+
+def set_id_lookup(id_lookup):
+    id_lookup_path = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
+    with open(id_lookup_path, 'w') as f:
+        json.dump(id_lookup, f, indent=2)
+
+
+def expand_challenge_id(challenge_id):
+    if challenge_id.startswith(':'):
+        challenge_id = get_id_lookup().get(challenge_id[1:], challenge_id)
+    return challenge_id
 
 
 Challenge = namedtuple('Challenge', 'in_text out_text in_ext out_ext id compliant api_key')
@@ -258,14 +305,23 @@ def local(infile, outfile):
 
 
 def put(challenge_id):
-    # TODO: validate challenge_id
+    challenge_id = expand_challenge_id(challenge_id)
+    if not validate_challenge_id(challenge_id):
+        show_challenge_id_error()
+        return STATUS_FAILURE
     api_key = get_api_key()
-    if api_key is None:
+    if not validate_api_key(api_key):
+        write('An API key has not been configured', color='red')
+        write('Uploading to vimgolf.com is disabled', color='red')
         show_api_key_help()
-        # TODO: change this exit to a question of whether to proceed, without upload
-        # capability. Or "press any key to continue without upload capability".
-        # In either case, be sure to set a flag that uploads disabled.
-        exit(1)
+        while True:
+            selection = input_loop("Play without uploads? [y/n] ").lower()
+            if selection in ('y', 'yes'):
+                break
+            elif selection in ('n', 'no'):
+                return STATUS_FAILURE
+            else:
+                write('Invalid selection: {}'.format(selection), color='red')
 
     url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}.json'.format(challenge_id))
     try:
@@ -288,7 +344,7 @@ def put(challenge_id):
         # Sanitize extensions
         in_ext = re.sub(r'[^\w-]', '_', in_ext)
         out_ext = re.sub(r'[^\w-]', '_', out_ext)
-    except  Exception:
+    except Exception:
         # TODO: error message
         return STATUS_FAILURE
 
@@ -317,6 +373,8 @@ def list_(page=None, limit=10):
         nodes = parse_html(response.body)
         challenge_elements = get_elements_by_classname(nodes, 'challenge')
         for element in challenge_elements:
+            if len(listings) >= limit:
+                break
             id_, name, n_entries = None, None, None
             anchor = get_elements_by_tagname(element.children, 'a')[0]
             href = anchor.get_attr('href')
@@ -333,20 +391,23 @@ def list_(page=None, limit=10):
         return STATUS_FAILURE
 
     for idx, listing in enumerate(listings):
-        if idx >= limit: break
-        write('{}. '.format(idx + 1), end=None)
+        write(':{} '.format(idx + 1), end=None)
         write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
         write(listing.id, color='orange', end=None)
         write(')')
 
-    # TODO: retain the mapping of listing number to ID, so it can be used by put and show
-    # (probably prepended by : when used)
+    id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
+    set_id_lookup(id_lookup)
 
     return STATUS_SUCCESS
 
 
 def show(challenge_id):
     try:
+        challenge_id = expand_challenge_id(challenge_id)
+        if not validate_challenge_id(challenge_id):
+            show_challenge_id_error()
+            return STATUS_FAILURE
         api_url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}.json'.format(challenge_id))
         api_response = http_get(api_url)
         challenge_spec = json.loads(api_response.body)
@@ -388,9 +449,8 @@ def show(challenge_id):
 
 
 def config(api_key=None):
-    if api_key is not None and not re.match(r'[\w\d]{32}', api_key):
-        message = 'Invalid key, please check your key on vimgolf.com'
-        write(message, stream=sys.stderr, color='red')
+    if not validate_api_key(api_key):
+        show_api_key_error()
         return STATUS_FAILURE
 
     if api_key:
