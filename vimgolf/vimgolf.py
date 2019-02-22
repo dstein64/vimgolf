@@ -192,16 +192,24 @@ def expand_challenge_id(challenge_id):
     return challenge_id
 
 
-Challenge = namedtuple('Challenge', 'in_text out_text in_ext out_ext id compliant api_key')
+Challenge = namedtuple('Challenge', [
+    'in_text',
+    'out_text',
+    'in_extension',
+    'out_extension',
+    'id',
+    'compliant',
+    'api_key'
+])
 
 
 def play(challenge, workspace):
     infile = os.path.join(workspace, 'in')
-    if challenge.in_ext:
-        infile += challenge.in_ext
+    if challenge.in_extension:
+        infile += challenge.in_extension
     outfile = os.path.join(workspace, 'out')
-    if challenge.out_ext:
-        outfile += challenge.out_ext
+    if challenge.out_extension:
+        outfile += challenge.out_extension
     logfile = os.path.join(workspace, 'log')
     with open(outfile, 'w') as f:
         f.write(challenge.out_text)
@@ -289,13 +297,13 @@ def local(infile, outfile):
         in_text = format_(f.read())
     with open(outfile, 'r') as f:
         out_text = format_(f.read())
-    _, in_ext = os.path.splitext(infile)
-    _, out_ext = os.path.splitext(outfile)
+    _, in_extension = os.path.splitext(infile)
+    _, out_extension = os.path.splitext(outfile)
     challenge = Challenge(
         in_text=in_text,
         out_text=out_text,
-        in_ext=in_ext,
-        out_ext=out_ext,
+        in_extension=in_extension,
+        out_extension=out_extension,
         id=None,
         compliant=None,
         api_key=None)
@@ -339,11 +347,11 @@ def put(challenge_id):
 
         in_text = format_(challenge_spec['in']['data'])
         out_text = format_(challenge_spec['out']['data'])
-        in_ext = '.{}'.format(challenge_spec['in']['type'])
-        out_ext = '.{}'.format(challenge_spec['out']['type'])
-        # Sanitize extensions
-        in_ext = re.sub(r'[^\w-]', '_', in_ext)
-        out_ext = re.sub(r'[^\w-]', '_', out_ext)
+        in_type = challenge_spec['in']['type']
+        out_type = challenge_spec['out']['type']
+        # Sanitize and add leading dot
+        in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
+        out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
     except Exception:
         # TODO: error message
         return STATUS_FAILURE
@@ -351,8 +359,8 @@ def put(challenge_id):
     challenge = Challenge(
         in_text=in_text,
         out_text=out_text,
-        in_ext=in_ext,
-        out_ext=out_ext,
+        in_extension=in_extension,
+        out_extension=out_extension,
         id=challenge_id,
         compliant=compliant,
         api_key=api_key)
