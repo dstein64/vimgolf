@@ -53,6 +53,9 @@ VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
 VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
 
+# Max number of listings by default for 'vimgolf list'
+LISTING_LIMIT = 10
+
 
 # ************************************************************
 # * Utils
@@ -372,7 +375,7 @@ def put(challenge_id):
     return status
 
 
-def list_(page=None, limit=10):
+def list_(page=None, limit=LISTING_LIMIT):
     Listing = namedtuple('Listing', 'id name n_entries')
     try:
         listings = []
