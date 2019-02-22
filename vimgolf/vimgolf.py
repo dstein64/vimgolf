@@ -73,6 +73,7 @@ def join_lines(string):
 
 
 def write(string, end='\n', stream=None, color=None):
+    string = str(string)
     color_lookup = {
         'red':    '\033[31m',
         'green':  '\033[32m',
@@ -84,10 +85,18 @@ def write(string, end='\n', stream=None, color=None):
     if stream is None:
         stream = sys.stdout
     if color and hasattr(stream, 'isatty') and stream.isatty():
-        string = color_lookup[color] + str(string) + end_color
+        string = color_lookup[color] + string + end_color
     stream.write(string)
     if end is not None:
         stream.write(str(end))
+
+
+def format_(string):
+    """dos2unix and add newline to end."""
+    string = string.replace('\r\n', '\n').replace('\r', '\n')
+    if not string.endswith('\n'):
+        string = string + '\n'
+    return string
 
 
 # ************************************************************
@@ -114,30 +123,47 @@ def show_api_key_help():
     write('Please run "vimgolf config API_KEY" to set your API key', color='orange')
 
 
-def play(infile, outfile):
-    """Warning: Destructively modifies 'infile'"""
-    with tempfile.NamedTemporaryFile(mode='w+b') as f:
-        args = GOLF_VIM.split()
-        vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-        logfile = f.name
-        args += [
-            '-Z',          # restricted mode, utilities not allowed
-            '-n',          # no swap file, memory only editing
-            '--noplugin',  # no plugins
-            '--nofork',    # so gvim doesn't return immediately
-            '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-            '+0',          # start on line 0
-            '-u', vimrc,   # vimgolf .vimrc
-            '-U', 'NONE',  # don't load .gvimrc
-            '-W', logfile, # keylog file (overwrites existing)
-            infile
-        ]
-        subprocess.run(args)
+Challenge = namedtuple('Challenge', 'in_text out_text in_ext out_ext id compliant api_key')
 
-        correct = filecmp.cmp(infile, outfile)
-        with open(logfile, 'rb') as _f:
-            # raw keypress representation saved by vim's -w
-            raw_keys = _f.read()
+
+def play(challenge, workspace):
+    infile = os.path.join(workspace, 'in')
+    if challenge.in_ext:
+        infile += challenge.in_ext
+    outfile = os.path.join(workspace, 'out')
+    if challenge.out_ext:
+        outfile += challenge.out_ext
+    logfile = os.path.join(workspace, 'log')
+    with open(outfile, 'w') as f:
+        f.write(challenge.out_text)
+
+    # TODO: here is where the loop should start.
+    #       so that infile is clobbered. logfile is automatically clobbered from -W.
+    #       outfile doesn't change...
+
+    with open(infile, 'w') as f:
+        f.write(challenge.in_text)
+
+    args = GOLF_VIM.split()
+    vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+    args += [
+        '-Z',          # restricted mode, utilities not allowed
+        '-n',          # no swap file, memory only editing
+        '--noplugin',  # no plugins
+        '--nofork',    # so gvim doesn't return immediately
+        '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
+        '+0',          # start on line 0
+        '-u', vimrc,   # vimgolf .vimrc
+        '-U', 'NONE',  # don't load .gvimrc
+        '-W', logfile, # keylog file (overwrites existing)
+        infile
+    ]
+    subprocess.run(args)
+
+    correct = filecmp.cmp(infile, outfile)
+    with open(logfile, 'rb') as _f:
+        # raw keypress representation saved by vim's -w
+        raw_keys = _f.read()
 
     # list of parsed keycode byte strings
     keycodes = parse_keycodes(raw_keys)
@@ -148,20 +174,44 @@ def play(infile, outfile):
 
     score = len(keycodes)
 
-    write('Score: {}'.format(score))
     write('Here are your keystrokes:', color='green')
     for keycode_repr in keycode_reprs:
-        color = 'red' if len(keycode_repr) > 1 else None
+        color = 'orange' if len(keycode_repr) > 1 else None
         write(keycode_repr, color=color, end=None)
     write('')
-    print(logfile)
+
+    if correct:
+        write('Success! Your output matches.', color='green')
+        write('Your score:', color='green')
+    else:
+        write('Uh oh, looks like your entry does not match the desired output.', color='red')
+        write('Your score for this failed attempt:', color='red')
+    write(score)
+
+    if challenge.id and challenge.compliant and challenge.api_key:
+        # TODO: this scenario means uploads are eligible
+        pass
 
     return STATUS_SUCCESS
 
 
 def local(infile, outfile):
-    # TODO: create copy of infile so it's not destructively modified
-    status = play(infile, outfile)
+    with open(infile, 'r') as f:
+        in_text = format_(f.read())
+    with open(outfile, 'r') as f:
+        out_text = format_(f.read())
+    _, in_ext = os.path.splitext(infile)
+    _, out_ext = os.path.splitext(outfile)
+    challenge = Challenge(
+        in_text=in_text,
+        out_text=out_text,
+        in_ext=in_ext,
+        out_ext=out_ext,
+        id=None,
+        compliant=None,
+        api_key=None)
+    with tempfile.TemporaryDirectory() as d:
+        status = play(challenge, d)
     return status
 
 
@@ -184,7 +234,9 @@ def put(challenge_id):
         # TODO: error message
         return STATUS_FAILURE
     challenge_spec = json.loads(response.body)
+    compliant = True
     if challenge_spec['client'] != RUBY_CLIENT_VERSION_COMPLIANCE:
+        compliant = False
         # TODO: Issue warning and make sure not to upload.
         # TODO: Also check for fields appropriately... (in/out)
         # TODO: Also use Python versioning library for checking if client version is older or newer...
@@ -192,10 +244,18 @@ def put(challenge_id):
         #       for response type json.
         pass
 
+    # TODO: create temporary infile/outfile from challenge_spec. replace \r\n with \n.
+    #       sanitize file extension and retain in new filename.
+    #       make sure file ends with \n
+    infile = None
+    outfile = None
+
     # TODO: play() should take strings as input and construct
     #       temporary files...
+    challenge = Challenge(infile=infile, outfile=outfile, id=challenge_id, compliant=compliant)
+    status = play(challenge)
 
-    return STATUS_SUCCESS
+    return status
 
 
 def list_(page=None, limit=10):
@@ -231,8 +291,8 @@ def list_(page=None, limit=10):
         write(listing.id, color='orange', end=None)
         write(')')
 
-    # TODO: retain the mapping of listing number to ID, so it can be used by put
-    # (probably prepended by # for put)
+    # TODO: retain the mapping of listing number to ID, so it can be used by put and show
+    # (probably prepended by : when used)
 
     return STATUS_SUCCESS
 
