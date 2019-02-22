@@ -88,6 +88,9 @@ def write(string, end='\n', stream=None, color=None):
         'red':    '\033[31m',
         'green':  '\033[32m',
         'orange': '\033[33m',
+        'blue':   '\033[34m',
+        'purple': '\033[35m',
+        'cyan':   '\033[36m',
     }
     end_color = '\033[0m'
     if color and color not in color_lookup:
@@ -256,7 +259,7 @@ def play(challenge, workspace):
 
         write('Here are your keystrokes:', color='green')
         for keycode_repr in keycode_reprs:
-            color = 'orange' if len(keycode_repr) > 1 else None
+            color = 'purple' if len(keycode_repr) > 1 else None
             write(keycode_repr, color=color, end=None)
         write('')
 
@@ -288,7 +291,7 @@ def play(challenge, workspace):
                 diff_args = GOLF_DIFF.split() + [infile, outfile]
                 subprocess.run(diff_args)
             elif selection == 'w':
-                # TODO: upload result and print message on success
+                # TODO: upload result and print message on success. possibly set upload_eligible = False after success.
                 pass
             else:
                 break
