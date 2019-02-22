@@ -109,7 +109,7 @@ def format_(string):
 def input_loop(prompt, strip=True, required=True):
     try:
         import readline
-    except:
+    except Exception:
         pass
     while True:
         try:
@@ -117,9 +117,10 @@ def input_loop(prompt, strip=True, required=True):
             if strip:
                 selection = selection.strip()
         except EOFError:
+            write('')
             sys.exit(STATUS_FAILURE)
         except KeyboardInterrupt:
-            # With readline, stdin is flushed after a KeyboarInterrupt.
+            # With readline, stdin is flushed after a KeyboardInterrupt.
             # Otherwise, exit.
             if 'readline' not in sys.modules:
                 sys.exit(STATUS_FAILURE)
