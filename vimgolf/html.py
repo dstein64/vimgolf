@@ -71,12 +71,10 @@ def parse_html(html):
 
 
 def get_element_by_id(nodes, id_):
-    element = None
     for node in nodes:
         if isinstance(node, Element) and node.get_id() == id_:
-            element = node
-            break
-    return element
+            return node
+    return None
 
 
 def get_elements_by_classname(nodes, classname):

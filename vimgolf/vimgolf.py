@@ -273,15 +273,16 @@ def play(challenge, workspace):
 
         upload_eligible = challenge.id and challenge.compliant and challenge.api_key
 
-        menu = []
-        if not correct:
-            menu.append(('d', 'Show diff'))
-        if upload_eligible and correct:
-            menu.append(('w', 'Upload result'))
-        menu.append(('r', 'Retry the current challenge'))
-        menu.append(('q', 'Quit vimgolf'))
-        valid_codes = [x[0] for x in menu]
         while True:
+            # Generate menu in loop since it may change across iterations
+            menu = []
+            if not correct:
+                menu.append(('d', 'Show diff'))
+            if upload_eligible and correct:
+                menu.append(('w', 'Upload result'))
+            menu.append(('r', 'Retry the current challenge'))
+            menu.append(('q', 'Quit vimgolf'))
+            valid_codes = [x[0] for x in menu]
             for option in menu:
                 write('[{}] {}'.format(*option), color='orange')
             selection = input_loop("Choice> ")
@@ -291,8 +292,11 @@ def play(challenge, workspace):
                 diff_args = GOLF_DIFF.split() + [infile, outfile]
                 subprocess.run(diff_args)
             elif selection == 'w':
-                # TODO: upload result and print message on success. possibly set upload_eligible = False after success.
-                pass
+                # TODO: upload result and print message on success.
+                # TODO: possibly set upload_eligible = False after success.
+                success = True
+                if success:
+                    upload_eligible = False
             else:
                 break
         if selection == 'q':
