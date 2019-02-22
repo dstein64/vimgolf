@@ -335,9 +335,8 @@ def put(challenge_id):
     try:
         response = http_get(url)
         challenge_spec = json.loads(response.body)
-        compliant = True
-        if challenge_spec['client'] != RUBY_CLIENT_VERSION_COMPLIANCE:
-            compliant = False
+        compliant = challenge_spec['client'] == RUBY_CLIENT_VERSION_COMPLIANCE
+        if not compliant:
             # TODO: Issue warning and make sure not to upload.
             # TODO: Also check for fields appropriately... (in/out)
             # TODO: Also use Python versioning library for checking if client version is older or newer...
