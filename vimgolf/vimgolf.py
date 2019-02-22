@@ -1,4 +1,3 @@
-from cgi import parse_header
 from collections import namedtuple
 import filecmp
 import json
@@ -57,8 +56,7 @@ def http_get(url):
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
     response = urllib.request.urlopen(request)
     try:
-        # TODO: get rid of cgi dependency. do this manually
-        charset = parse_header(response.getheader('Content-Type'))[1]['charset']
+        charset = response.getheader('Content-Type').split(';')[1].split('=')[1].strip()
     except Exception:
         charset = 'utf-8'
     body = response.read().decode(charset)
@@ -99,6 +97,30 @@ def format_(string):
     return string
 
 
+def input_loop(prompt, strip=True, required=True):
+    try:
+        import readline
+    except:
+        pass
+    while True:
+        try:
+            selection = input(prompt)
+            if strip:
+                selection = selection.strip()
+        except EOFError:
+            sys.exit(1)
+        except KeyboardInterrupt:
+            # With readline, stdin is flushed after a KeyboarInterrupt.
+            # Otherwise, exit.
+            if 'readline' not in sys.modules:
+                sys.exit(1)
+            write('')
+            continue
+        if required and not selection:
+            continue
+        break
+    return selection
+
 # ************************************************************
 # * Core
 # ************************************************************
@@ -137,60 +159,80 @@ def play(challenge, workspace):
     with open(outfile, 'w') as f:
         f.write(challenge.out_text)
 
-    # TODO: here is where the loop should start.
-    #       so that infile is clobbered. logfile is automatically clobbered from -W.
-    #       outfile doesn't change...
+    while True:
+        with open(infile, 'w') as f:
+            f.write(challenge.in_text)
 
-    with open(infile, 'w') as f:
-        f.write(challenge.in_text)
+        vim_args = GOLF_VIM.split()
+        vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+        vim_args += [
+            '-Z',          # restricted mode, utilities not allowed
+            '-n',          # no swap file, memory only editing
+            '--noplugin',  # no plugins
+            '--nofork',    # so gvim doesn't return immediately
+            '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
+            '+0',          # start on line 0
+            '-u', vimrc,   # vimgolf .vimrc
+            '-U', 'NONE',  # don't load .gvimrc
+            '-W', logfile, # keylog file (overwrites existing)
+            infile
+        ]
+        subprocess.run(vim_args)
 
-    args = GOLF_VIM.split()
-    vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-    args += [
-        '-Z',          # restricted mode, utilities not allowed
-        '-n',          # no swap file, memory only editing
-        '--noplugin',  # no plugins
-        '--nofork',    # so gvim doesn't return immediately
-        '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-        '+0',          # start on line 0
-        '-u', vimrc,   # vimgolf .vimrc
-        '-U', 'NONE',  # don't load .gvimrc
-        '-W', logfile, # keylog file (overwrites existing)
-        infile
-    ]
-    subprocess.run(args)
+        correct = filecmp.cmp(infile, outfile)
+        with open(logfile, 'rb') as _f:
+            # raw keypress representation saved by vim's -w
+            raw_keys = _f.read()
 
-    correct = filecmp.cmp(infile, outfile)
-    with open(logfile, 'rb') as _f:
-        # raw keypress representation saved by vim's -w
-        raw_keys = _f.read()
+        # list of parsed keycode byte strings
+        keycodes = parse_keycodes(raw_keys)
+        keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
 
-    # list of parsed keycode byte strings
-    keycodes = parse_keycodes(raw_keys)
-    keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
+        # list of human-readable key strings
+        keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
 
-    # list of human-readable key strings
-    keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
+        score = len(keycodes)
 
-    score = len(keycodes)
+        write('Here are your keystrokes:', color='green')
+        for keycode_repr in keycode_reprs:
+            color = 'orange' if len(keycode_repr) > 1 else None
+            write(keycode_repr, color=color, end=None)
+        write('')
 
-    write('Here are your keystrokes:', color='green')
-    for keycode_repr in keycode_reprs:
-        color = 'orange' if len(keycode_repr) > 1 else None
-        write(keycode_repr, color=color, end=None)
-    write('')
+        if correct:
+            write('Success! Your output matches.', color='green')
+            write('Your score:', color='green')
+        else:
+            write('Uh oh, looks like your entry does not match the desired output.', color='red')
+            write('Your score for this failed attempt:', color='red')
+        write(score)
 
-    if correct:
-        write('Success! Your output matches.', color='green')
-        write('Your score:', color='green')
-    else:
-        write('Uh oh, looks like your entry does not match the desired output.', color='red')
-        write('Your score for this failed attempt:', color='red')
-    write(score)
+        upload_eligible = challenge.id and challenge.compliant and challenge.api_key
 
-    if challenge.id and challenge.compliant and challenge.api_key:
-        # TODO: this scenario means uploads are eligible
-        pass
+        menu = []
+        if not correct:
+            menu.append(('d', 'Show diff'))
+        if upload_eligible and correct:
+            menu.append(('w', 'Upload result'))
+        menu.append(('r', 'Retry the current challenge'))
+        menu.append(('q', 'Quit vimgolf'))
+        valid_codes = [x[0] for x in menu]
+        while True:
+            for option in menu:
+                write('[{}] {}'.format(*option), color='orange')
+            selection = input_loop("Choice> ")
+            if selection not in valid_codes:
+                write('Invalid selection: {}'.format(selection), color='red')
+            elif selection == 'd':
+                diff_args = GOLF_DIFF.split() + [infile, outfile]
+                subprocess.run(diff_args)
+            elif selection == 'w':
+                # TODO: upload result
+                pass
+            else:
+                break
+        if selection == 'q':
+            break
 
     return STATUS_SUCCESS
 
@@ -216,6 +258,7 @@ def local(infile, outfile):
 
 
 def put(challenge_id):
+    # TODO: validate challenge_id
     api_key = get_api_key()
     if api_key is None:
         show_api_key_help()
@@ -224,36 +267,41 @@ def put(challenge_id):
         # In either case, be sure to set a flag that uploads disabled.
         exit(1)
 
-    # TODO: create copy of infile so it's not destructively modified
-    # TODO: check if credentials are set, and if not, issue a warning...
-
     url = urllib.parse.urljoin(GOLF_HOST, 'challenges/{}.json'.format(challenge_id))
     try:
         response = http_get(url)
+        challenge_spec = json.loads(response.body)
+        compliant = True
+        if challenge_spec['client'] != RUBY_CLIENT_VERSION_COMPLIANCE:
+            compliant = False
+            # TODO: Issue warning and make sure not to upload.
+            # TODO: Also check for fields appropriately... (in/out)
+            # TODO: Also use Python versioning library for checking if client version is older or newer...
+            # TODO: Also check that 'client' exists. If it doesn't, then not compliant. May also want to check
+            #       for response type json.
+            pass
+
+        in_text = format_(challenge_spec['in']['data'])
+        out_text = format_(challenge_spec['out']['data'])
+        in_ext = '.{}'.format(challenge_spec['in']['type'])
+        out_ext = '.{}'.format(challenge_spec['out']['type'])
+        # Sanitize extensions
+        in_ext = re.sub(r'[^\w-]', '_', in_ext)
+        out_ext = re.sub(r'[^\w-]', '_', out_ext)
     except  Exception:
         # TODO: error message
         return STATUS_FAILURE
-    challenge_spec = json.loads(response.body)
-    compliant = True
-    if challenge_spec['client'] != RUBY_CLIENT_VERSION_COMPLIANCE:
-        compliant = False
-        # TODO: Issue warning and make sure not to upload.
-        # TODO: Also check for fields appropriately... (in/out)
-        # TODO: Also use Python versioning library for checking if client version is older or newer...
-        # TODO: Also check that 'client' exists. If it doesn't, then not compliant. May also want to check
-        #       for response type json.
-        pass
 
-    # TODO: create temporary infile/outfile from challenge_spec. replace \r\n with \n.
-    #       sanitize file extension and retain in new filename.
-    #       make sure file ends with \n
-    infile = None
-    outfile = None
-
-    # TODO: play() should take strings as input and construct
-    #       temporary files...
-    challenge = Challenge(infile=infile, outfile=outfile, id=challenge_id, compliant=compliant)
-    status = play(challenge)
+    challenge = Challenge(
+        in_text=in_text,
+        out_text=out_text,
+        in_ext=in_ext,
+        out_ext=out_ext,
+        id=challenge_id,
+        compliant=compliant,
+        api_key=api_key)
+    with tempfile.TemporaryDirectory() as d:
+        status = play(challenge, d)
 
     return status
 
@@ -340,7 +388,7 @@ def show(challenge_id):
 
 
 def config(api_key=None):
-    if api_key is not None and not re.match('[\w\d]{32}', api_key):
+    if api_key is not None and not re.match(r'[\w\d]{32}', api_key):
         message = 'Invalid key, please check your key on vimgolf.com'
         write(message, stream=sys.stderr, color='red')
         return STATUS_FAILURE
