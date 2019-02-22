@@ -39,6 +39,8 @@ USER_AGENT = 'vimgolf'
 
 RUBY_CLIENT_VERSION_COMPLIANCE = '0.4.8'
 
+EXPANSION_PREFIX='+'
+
 USER_HOME = os.path.expanduser('~')
 
 CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
@@ -187,7 +189,7 @@ def set_id_lookup(id_lookup):
 
 
 def expand_challenge_id(challenge_id):
-    if challenge_id.startswith(':'):
+    if challenge_id.startswith(EXPANSION_PREFIX):
         challenge_id = get_id_lookup().get(challenge_id[1:], challenge_id)
     return challenge_id
 
@@ -398,7 +400,7 @@ def list_(page=None, limit=10):
         return STATUS_FAILURE
 
     for idx, listing in enumerate(listings):
-        write(':{} '.format(idx + 1), end=None)
+        write('{}{} '.format(EXPANSION_PREFIX, idx + 1), end=None)
         write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
         write(listing.id, color='orange', end=None)
         write(')')
