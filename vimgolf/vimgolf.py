@@ -1,6 +1,6 @@
 from collections import namedtuple
 from distutils.version import StrictVersion
-from enum import Enum, auto
+from enum import Enum
 import filecmp
 import json
 import os
@@ -27,8 +27,8 @@ with open(version_txt, 'r') as f:
 
 
 class Status(Enum):
-    SUCCESS = auto()
-    FAILURE = auto()
+    SUCCESS = 1
+    FAILURE = 2
 
 
 EXIT_SUCCESS = 0
