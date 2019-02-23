@@ -228,6 +228,7 @@ Challenge = namedtuple('Challenge', [
     'in_extension',
     'out_extension',
     'id',
+    'compliant',
     'api_key'
 ])
 
@@ -310,7 +311,7 @@ def play(challenge, workspace):
             write('Your score for this failed attempt:', color='red')
         write(score)
 
-        upload_eligible = challenge.id and challenge.api_key
+        upload_eligible = challenge.id and challenge.compliant and challenge.api_key
 
         while True:
             # Generate the menu items inside the loop since it can change across iterations
@@ -365,6 +366,7 @@ def local(infile, outfile):
         in_extension=in_extension,
         out_extension=out_extension,
         id=None,
+        compliant=None,
         api_key=None)
     with tempfile.TemporaryDirectory() as d:
         status = play(challenge, d)
@@ -391,6 +393,7 @@ def put(challenge_id):
         compliant = challenge_spec.get('client') == RUBY_CLIENT_VERSION_COMPLIANCE
         if not compliant:
             write('vimgolf=={} is not compliant with vimgolf.com'.format(__version__), color='red')
+            write('Uploading to vimgolf.com is disabled', color='red')
             write('vimgolf may not function properly', color='orange')
             try:
                 client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
@@ -399,7 +402,7 @@ def put(challenge_id):
             except Exception:
                 action = 'update'
             write('Please {} vimgolf to a compliant version'.format(action), color='orange')
-            if not confirm('Try to play?'):
+            if not confirm('Try to play without uploads?'):
                 return Status.FAILURE
 
         in_text = format_(challenge_spec['in']['data'])
@@ -420,6 +423,7 @@ def put(challenge_id):
         in_extension=in_extension,
         out_extension=out_extension,
         id=challenge_id,
+        compliant=compliant,
         api_key=api_key)
     with tempfile.TemporaryDirectory() as d:
         status = play(challenge, d)
