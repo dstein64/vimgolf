@@ -16,9 +16,13 @@ from vimgolf.html import (
     get_element_by_id,
     get_elements_by_tagname,
     parse_html,
-    TextNode
+    TextNode,
 )
-from vimgolf.keys import IGNORED_KEYSTROKES, get_keycode_repr, parse_keycodes
+from vimgolf.keys import (
+    get_keycode_repr,
+    IGNORED_KEYSTROKES,
+    parse_keycodes,
+)
 
 
 version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
@@ -93,12 +97,12 @@ def join_lines(string):
 def write(string, end='\n', stream=None, color=None):
     string = str(string)
     color_lookup = {
-        'red':    '\033[31m',
-        'green':  '\033[32m',
-        'orange': '\033[33m',
-        'blue':   '\033[34m',
-        'purple': '\033[35m',
-        'cyan':   '\033[36m',
+        'red':     '\033[31m',
+        'green':   '\033[32m',
+        'yellow':  '\033[33m',
+        'blue':    '\033[34m',
+        'magenta': '\033[35m',
+        'cyan':    '\033[36m',
     }
     end_color = '\033[0m'
     if color and color not in color_lookup:
@@ -192,8 +196,8 @@ def set_api_key(api_key):
 
 
 def show_api_key_help():
-    write('An API key can be obtained from vimgolf.com', color='orange')
-    write('Please run "vimgolf config API_KEY" to set your API key', color='orange')
+    write('An API key can be obtained from vimgolf.com', color='yellow')
+    write('Please run "vimgolf config API_KEY" to set your API key', color='yellow')
 
 
 def show_api_key_error():
@@ -299,7 +303,7 @@ def play(challenge, workspace):
 
         write('Here are your keystrokes:', color='green')
         for keycode_repr in keycode_reprs:
-            color = 'purple' if len(keycode_repr) > 1 else None
+            color = 'magenta' if len(keycode_repr) > 1 else None
             write(keycode_repr, color=color, end=None)
         write('')
 
@@ -325,7 +329,7 @@ def play(challenge, workspace):
             menu.append(('q', 'Quit vimgolf'))
             valid_codes = [x[0] for x in menu]
             for option in menu:
-                write('[{}] {}'.format(*option), color='orange')
+                write('[{}] {}'.format(*option), color='yellow')
             selection = input_loop("Choice> ")
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), color='red')
@@ -394,14 +398,14 @@ def put(challenge_id):
         if not compliant:
             write('vimgolf=={} is not compliant with vimgolf.com'.format(__version__), color='red')
             write('Uploading to vimgolf.com is disabled', color='red')
-            write('vimgolf may not function properly', color='orange')
+            write('vimgolf may not function properly', color='yellow')
             try:
                 client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
                 api_version = StrictVersion(challenge_spec['client'])
                 action = 'upgrade' if api_version > client_compliance_version else 'downgrade'
             except Exception:
                 action = 'update'
-            write('Please {} vimgolf to a compliant version'.format(action), color='orange')
+            write('Please {} vimgolf to a compliant version'.format(action), color='yellow')
             if not confirm('Try to play without uploads?'):
                 return Status.FAILURE
 
@@ -462,7 +466,7 @@ def list_(page=None, limit=LISTING_LIMIT):
     for idx, listing in enumerate(listings):
         write('{}{} '.format(EXPANSION_PREFIX, idx + 1), end=None)
         write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
-        write(listing.id, color='orange', end=None)
+        write(listing.id, color='yellow', end=None)
         write(')')
 
     id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
@@ -503,7 +507,7 @@ def show(challenge_id):
     separator = '-' * 50
     write(separator)
     write('{} ('.format(name), end=None)
-    write(challenge_id, color='orange', end=None)
+    write(challenge_id, color='yellow', end=None)
     write(')')
     write(separator)
     write(description)
