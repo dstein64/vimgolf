@@ -46,7 +46,7 @@ sixth challenge presented in the most recent call to `vimgolf list`.
 Demo
 ----
 
-![](https://github.com/dstein64/vimgolf/blob/master/screencast.gif?raw=true)
+![](https://github.com/dstein64/vimgolf/blob/master/screencast.gif?raw=true =800x)
 
 License
 -------
