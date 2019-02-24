@@ -1,13 +1,20 @@
+from enum import Enum
 from html.parser import HTMLParser
 
+class NodeType(Enum):
+    ELEMENT = 1
+    TEXT = 2
+
+
 class Node:
-    def __init__(self):
+    def __init__(self, node_type):
         self.parent = None
+        self.node_type = node_type
 
 
 class Element(Node):
     def __init__(self, tag, attrs):
-        Node.__init__(self)
+        Node.__init__(self, NodeType.ELEMENT)
         self.tag = tag
         self.attrs = attrs
         self.children = []
@@ -35,7 +42,7 @@ class Element(Node):
 
 class TextNode(Node):
     def __init__(self, data):
-        Node.__init__(self)
+        Node.__init__(self, NodeType.TEXT)
         self.data = data
 
 
@@ -72,7 +79,7 @@ def parse_html(html):
 
 def get_element_by_id(nodes, id_):
     for node in nodes:
-        if isinstance(node, Element) and node.get_id() == id_:
+        if node.node_type == NodeType.ELEMENT and node.get_id() == id_:
             return node
     return None
 
@@ -80,7 +87,7 @@ def get_element_by_id(nodes, id_):
 def get_elements_by_classname(nodes, classname):
     output = []
     for node in nodes:
-        if isinstance(node, Element) and node.has_class(classname):
+        if node.node_type == NodeType.ELEMENT and node.has_class(classname):
             output.append(node)
     return output
 
@@ -88,6 +95,6 @@ def get_elements_by_classname(nodes, classname):
 def get_elements_by_tagname(nodes, tagname):
     output = []
     for node in nodes:
-        if isinstance(node, Element) and node.tag == tagname:
+        if node.node_type == NodeType.ELEMENT and node.tag == tagname:
             output.append(node)
     return output

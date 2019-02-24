@@ -15,8 +15,8 @@ from vimgolf.html import (
     get_elements_by_classname,
     get_element_by_id,
     get_elements_by_tagname,
+    NodeType,
     parse_html,
-    TextNode,
 )
 from vimgolf.keys import (
     get_keycode_repr,
@@ -454,7 +454,7 @@ def list_(page=None, limit=LISTING_LIMIT):
             id_ = href.split('/')[-1]
             name = anchor.children[0].data
             for child in element.children:
-                if isinstance(child, TextNode) and 'entries' in child.data:
+                if child.node_type == NodeType.TEXT and 'entries' in child.data:
                     n_entries = int([x for x in child.data.split() if x.isdigit()][0])
                     break
             listing = Listing(id=id_, name=name, n_entries=n_entries)
