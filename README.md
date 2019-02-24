@@ -28,6 +28,23 @@ $ pip3 install --upgrade vimgolf
 Usage
 -----
 
+#### Launch
+
+If the launcher script was installed within a directory on your `PATH`, vimgolf can be launched
+directly.
+
+```sh
+$ vimgolf
+```
+
+Otherwise, vimgolf can be launched by passing its module name to Python.
+
+```sh
+$ python3 -m vimgolf
+```
+
+#### Commands
+
 ```text
 Commands:
   vimgolf [help]                # display this help and exit
