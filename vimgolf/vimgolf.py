@@ -153,7 +153,7 @@ def input_loop(prompt, strip=True, required=True):
 
 def confirm(prompt):
     while True:
-        selection = input_loop("{} [y/n] ".format(prompt)).lower()
+        selection = input_loop('{} [y/n] '.format(prompt)).lower()
         if selection in ('y', 'yes'):
             break
         elif selection in ('n', 'no'):
@@ -330,7 +330,7 @@ def play(challenge, workspace):
             valid_codes = [x[0] for x in menu]
             for option in menu:
                 write('[{}] {}'.format(*option), color='yellow')
-            selection = input_loop("Choice> ")
+            selection = input_loop('Choice> ')
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), color='red')
             elif selection == 'd':

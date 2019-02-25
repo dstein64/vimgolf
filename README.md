@@ -3,7 +3,7 @@ vimgolf
 
 This project contains a [vimgolf](https://www.vimgolf.com/) client written in Python.
 
-The user interface is similar to the [official vimgolf client](https://github.com/igrigorik/vimgolf)
+The user interface is similar to the [official vimgolf client](https://github.com/igrigorik/vimgolf),
 with a few additions inspired by [vimgolf-finder](https://github.com/kciter/vimgolf-finder).
 
 Installation
