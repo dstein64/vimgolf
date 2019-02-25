@@ -1,4 +1,5 @@
 from collections import namedtuple
+from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
@@ -277,14 +278,19 @@ def play(challenge, workspace):
             '-Z',          # restricted mode, utilities not allowed
             '-n',          # no swap file, memory only editing
             '--noplugin',  # no plugins
-            '--nofork',    # so gvim doesn't return immediately
             '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
             '+0',          # start on line 0
             '-u', vimrc,   # vimgolf .vimrc
             '-U', 'NONE',  # don't load .gvimrc
             '-W', logfile, # keylog file (overwrites existing)
-            infile
         ]
+        # Add special handling for nofork, since nvim doesn't accept that option.
+        vim_name = os.path.basename(os.path.realpath(find_executable(vim_args[0])))
+        if vim_name != 'nvim':
+            # so gvim and nvim-qt don't return immediately
+            vim_args.append('--nofork')
+
+        vim_args.append(infile)
         subprocess.run(vim_args)
 
         correct = filecmp.cmp(infile, outfile)
