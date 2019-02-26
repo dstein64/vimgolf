@@ -1,5 +1,5 @@
 from enum import Enum
-from html.parser import HTMLParser
+import html.parser
 
 class NodeType(Enum):
     ELEMENT = 1
@@ -46,9 +46,9 @@ class TextNode(Node):
         self.data = data
 
 
-class HtmlParser(HTMLParser):
+class HTMLParser(html.parser.HTMLParser):
     def __init__(self):
-        HTMLParser.__init__(self)
+        html.parser.HTMLParser.__init__(self)
         self.nodes = []
         self._stack = []
 
@@ -72,7 +72,7 @@ class HtmlParser(HTMLParser):
 
 
 def parse_html(html):
-    parser = HtmlParser()
+    parser = HTMLParser()
     parser.feed(html)
     return parser.nodes
 
