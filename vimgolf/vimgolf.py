@@ -657,6 +657,7 @@ def main(argv=sys.argv):
         write(__version__)
         status = Status.SUCCESS
     elif command == 'debug':
+        # Undocumented command for printing last log file
         status = debug()
     else:
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
