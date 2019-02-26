@@ -4,7 +4,6 @@ from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
 import json
-import logging
 import logging.handlers
 import os
 import re
