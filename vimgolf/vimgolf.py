@@ -4,6 +4,8 @@ from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
 import json
+import logging
+import logging.handlers
 import os
 import re
 import subprocess
@@ -41,7 +43,7 @@ EXIT_FAILURE = 1
 
 
 # ************************************************************
-# * Configuration and Global Variables
+# * Configuration, Global Variables, and Logging
 # ************************************************************
 
 GOLF_HOST = os.environ.get('GOLF_HOST', 'https://www.vimgolf.com')
@@ -56,6 +58,11 @@ EXPANSION_PREFIX='+'
 
 USER_HOME = os.path.expanduser('~')
 
+# Max number of listings by default for 'vimgolf list'
+LISTING_LIMIT = 10
+
+LOG_ROTATE_COUNT = 10
+
 CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
 VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
@@ -66,8 +73,25 @@ VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
 VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
 
-# Max number of listings by default for 'vimgolf list'
-LISTING_LIMIT = 10
+CACHE_HOME = os.environ.get('XDG_CACHE_HOME', os.path.join(USER_HOME, '.cache'))
+VIMGOLF_CACHE_PATH = os.path.join(CACHE_HOME, 'vimgolf')
+os.makedirs(VIMGOLF_CACHE_PATH, exist_ok=True)
+
+VIMGOLF_LOG_DIR_PATH = os.path.join(VIMGOLF_CACHE_PATH, 'log')
+os.makedirs(VIMGOLF_LOG_DIR_PATH, exist_ok=True)
+VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf.log')
+
+rotation_pending = os.path.exists(VIMGOLF_LOG_PATH)
+logger = logging.getLogger('vimgolf')
+logger.setLevel(logging.DEBUG)
+handler = logging.handlers.RotatingFileHandler(
+    VIMGOLF_LOG_PATH, backupCount=LOG_ROTATE_COUNT)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+if rotation_pending:
+    handler.doRollover()
 
 
 # ************************************************************
@@ -140,10 +164,6 @@ def input_loop(prompt, strip=True, required=True):
             write('')
             sys.exit(EXIT_FAILURE)
         except KeyboardInterrupt:
-            # With readline, stdin is flushed after a KeyboardInterrupt.
-            # Otherwise, exit.
-            if 'readline' not in sys.modules:
-                sys.exit(EXIT_FAILURE)
             write('')
             continue
         if required and not selection:
@@ -160,7 +180,7 @@ def confirm(prompt):
         elif selection in ('n', 'no'):
             return False
         else:
-            write('Invalid selection: {}'.format(selection), color='red', stream=sys.stdout)
+            write('Invalid selection: {}'.format(selection), stream=sys.stdout, color='red')
     return True
 
 
@@ -253,11 +273,12 @@ def upload_result(challenge_id, api_key, raw_keys):
         if message.get('status') == 'ok':
             status = Status.SUCCESS
     except Exception:
-        pass
+        logger.exception('upload failed')
     return status
 
 
 def play(challenge, workspace):
+    logger.info('play(...)')
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
         infile += challenge.in_extension
@@ -338,7 +359,7 @@ def play(challenge, workspace):
                 write('[{}] {}'.format(*option), color='yellow')
             selection = input_loop('Choice> ')
             if selection not in valid_codes:
-                write('Invalid selection: {}'.format(selection), color='red')
+                write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
             elif selection == 'd':
                 diff_args = GOLF_DIFF.split() + [infile, outfile]
                 subprocess.run(diff_args)
@@ -351,9 +372,9 @@ def play(challenge, workspace):
                     write('View the leaderboard: {}'.format(leaderboard), color='green')
                     upload_eligible = False
                 else:
-                    write('The entry upload has failed', color='red', stream=sys.stderr)
+                    write('The entry upload has failed', stream=sys.stderr, color='red')
                     message = 'Please check your API key on vimgolf.com'
-                    write(message, color='red', stream=sys.stderr)
+                    write(message, stream=sys.stderr, color='red')
             else:
                 break
         if selection == 'q':
@@ -364,6 +385,7 @@ def play(challenge, workspace):
 
 
 def local(infile, outfile):
+    logger.info('local(%s, %s)', infile, outfile)
     with open(infile, 'r') as f:
         in_text = format_(f.read())
     with open(outfile, 'r') as f:
@@ -384,6 +406,7 @@ def local(infile, outfile):
 
 
 def put(challenge_id):
+    logger.info('put(%s)', challenge_id)
     challenge_id = expand_challenge_id(challenge_id)
     if not validate_challenge_id(challenge_id):
         show_challenge_id_error()
@@ -402,8 +425,9 @@ def put(challenge_id):
         challenge_spec = json.loads(response.body)
         compliant = challenge_spec.get('client') == RUBY_CLIENT_VERSION_COMPLIANCE
         if not compliant:
-            write('vimgolf=={} is not compliant with vimgolf.com'.format(__version__), color='red')
-            write('Uploading to vimgolf.com is disabled', color='red')
+            message = 'vimgolf=={} is not compliant with vimgolf.com'.format(__version__)
+            write(message, stream=sys.stderr, color='red')
+            write('Uploading to vimgolf.com is disabled', stream=sys.stderr, color='red')
             write('vimgolf may not function properly', color='yellow')
             try:
                 client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
@@ -423,8 +447,9 @@ def put(challenge_id):
         in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
         out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
     except Exception:
-        write('The challenge retrieval has failed', color='red', stream=sys.stderr)
-        write('Please check the challenge ID on vimgolf.com', color='red', stream=sys.stderr)
+        logger.exception('challenge retrieval failed')
+        write('The challenge retrieval has failed', stream=sys.stderr, color='red')
+        write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
         return Status.FAILURE
 
     challenge = Challenge(
@@ -442,6 +467,7 @@ def put(challenge_id):
 
 
 def list_(page=None, limit=LISTING_LIMIT):
+    logger.info('list_(%s, %s)', page, limit)
     Listing = namedtuple('Listing', 'id name n_entries')
     try:
         listings = []
@@ -466,7 +492,8 @@ def list_(page=None, limit=LISTING_LIMIT):
             listing = Listing(id=id_, name=name, n_entries=n_entries)
             listings.append(listing)
     except Exception:
-        write('The challenge list retrieval has failed', color='red', stream=sys.stderr)
+        logger.exception('challenge retrieval failed')
+        write('The challenge list retrieval has failed', stream=sys.stderr, color='red')
         return Status.FAILURE
 
     for idx, listing in enumerate(listings):
@@ -482,6 +509,7 @@ def list_(page=None, limit=LISTING_LIMIT):
 
 
 def show(challenge_id):
+    logger.info('show(%s)', challenge_id)
     try:
         challenge_id = expand_challenge_id(challenge_id)
         if not validate_challenge_id(challenge_id):
@@ -506,8 +534,9 @@ def show(challenge_id):
         p_element = get_elements_by_tagname(grid_7_element.children, 'p')[0]
         description = join_lines(p_element.children[0].data)
     except Exception:
-        write('The challenge retrieval has failed', color='red', stream=sys.stderr)
-        write('Please check the challenge ID on vimgolf.com', color='red', stream=sys.stderr)
+        logger.exception('challenge retrieval failed')
+        write('The challenge retrieval has failed', stream=sys.stderr, color='red')
+        write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
         return Status.FAILURE
 
     separator = '-' * 50
@@ -529,6 +558,7 @@ def show(challenge_id):
 
 
 def config(api_key=None):
+    logger.info('config(...)')
     if api_key is not None and not validate_api_key(api_key):
         show_api_key_error()
         return Status.FAILURE
@@ -546,11 +576,21 @@ def config(api_key=None):
     return Status.SUCCESS
 
 
+def debug():
+    last_log = '{}.1'.format(VIMGOLF_LOG_PATH)
+    if os.path.exists(last_log):
+        with open(last_log, 'r') as f:
+            write(f.read(), end=None)
+    return Status.SUCCESS
+
+
 # ************************************************************
 # * Command Line Interface
 # ************************************************************
 
 def main(argv=sys.argv):
+    logger.info('vimgolf started')
+    logger.info('main(%s)', argv)
     if len(argv) < 2:
         command = 'help'
     else:
@@ -617,6 +657,8 @@ def main(argv=sys.argv):
     elif command == 'version':
         write(__version__)
         status = Status.SUCCESS
+    elif command == 'debug':
+        status = debug()
     else:
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
         status = Status.FAILURE
