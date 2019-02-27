@@ -294,6 +294,7 @@ def play(challenge, workspace):
         f.write(challenge.out_text)
 
     while True:
+        write('Launching vimgolf session', color='yellow')
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
@@ -383,6 +384,7 @@ def play(challenge, workspace):
                 break
         if selection == 'q':
             break
+        write('Retrying vimgolf challenge', color='yellow')
 
     write('Thanks for playing!', color='green')
     return Status.SUCCESS
@@ -424,6 +426,7 @@ def put(challenge_id):
             return Status.FAILURE
 
     try:
+        write('Downloading vimgolf challenge {}'.format(challenge_id), color='yellow')
         url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
         response = http_request(url)
         challenge_spec = json.loads(response.body)
@@ -605,7 +608,7 @@ def main(argv=sys.argv):
     help_message = (
         'Commands:\n'
         '  vimgolf [help]                # display this help and exit\n'
-        '  vimgolf config [API_KEY]      # configure your VimGolf credentials\n'
+        '  vimgolf config [API_KEY]      # configure your vimgolf.com credentials\n'
         '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
         '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
         '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
