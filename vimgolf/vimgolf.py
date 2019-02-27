@@ -1,4 +1,5 @@
 from collections import namedtuple
+import concurrent.futures
 from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
@@ -61,6 +62,10 @@ USER_HOME = os.path.expanduser('~')
 LISTING_LIMIT = 10
 
 LOG_ROTATE_COUNT = 10
+
+# Max number of parallel web requests.
+# As of 2018, most browsers use a max of six connections per hostname.
+MAX_REQUEST_WORKERS = 6
 
 CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
 VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
@@ -515,7 +520,11 @@ def show(challenge_id):
             show_challenge_id_error()
             return Status.FAILURE
         api_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
-        api_response = http_request(api_url)
+        page_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_REQUEST_WORKERS) as executor:
+            results = executor.map(http_request, [api_url, page_url])
+            api_response = next(results)
+            page_response = next(results)
         challenge_spec = json.loads(api_response.body)
         start_file = challenge_spec['in']['data']
         if not start_file.endswith('\n'):
@@ -523,8 +532,6 @@ def show(challenge_id):
         end_file = challenge_spec['out']['data']
         if not end_file.endswith('\n'):
             end_file += '\n'
-        page_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
-        page_response = http_request(page_url)
         nodes = parse_html(page_response.body)
         content_element = get_element_by_id(nodes, 'content')
         grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
