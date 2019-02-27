@@ -22,6 +22,9 @@ setup(
         'Topic :: Games/Entertainment',
     ],
     description='A vimgolf client written in Python',
+    entry_points={
+        'console_scripts': ['vimgolf=vimgolf.vimgolf:main'],
+    },
     keywords=['vim', 'vimgolf'],
     license='MIT',
     long_description=open('README.md').read(),
@@ -30,7 +33,6 @@ setup(
     package_data={'vimgolf': ['version.txt', 'vimgolf.vimrc']},
     packages=['vimgolf'],
     python_requires='>=3.5',
-    scripts=['bin/vimgolf'],
     url='https://github.com/dstein64/vimgolf',
     version=version,
 )
