@@ -293,8 +293,8 @@ def play(challenge, workspace):
     with open(outfile, 'w') as f:
         f.write(challenge.out_text)
 
+    write('Launching vimgolf session', color='yellow')
     while True:
-        write('Launching vimgolf session', color='yellow')
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
