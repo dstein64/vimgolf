@@ -251,6 +251,10 @@ def expand_challenge_id(challenge_id):
     return challenge_id
 
 
+def get_challenge_url(challenge_id):
+    return urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
+
+
 Challenge = namedtuple('Challenge', [
     'in_text',
     'out_text',
@@ -372,9 +376,8 @@ def play(challenge, workspace):
                 upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
                 if upload_status == Status.SUCCESS:
                     write('Uploaded entry!', color='green')
-                    leaderboard = urllib.parse.urljoin(
-                        GOLF_HOST, '/challenges/{}'.format(challenge.id))
-                    write('View the leaderboard: {}'.format(leaderboard), color='green')
+                    leaderboard_url = get_challenge_url(challenge.id)
+                    write('View the leaderboard: {}'.format(leaderboard_url), color='green')
                     upload_eligible = False
                 else:
                     write('The entry upload has failed', stream=sys.stderr, color='red')
@@ -523,7 +526,7 @@ def show(challenge_id):
             show_challenge_id_error()
             return Status.FAILURE
         api_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
-        page_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
+        page_url = get_challenge_url(challenge_id)
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_REQUEST_WORKERS) as executor:
             results = executor.map(http_request, [api_url, page_url])
             api_response = next(results)
