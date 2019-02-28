@@ -165,10 +165,11 @@ def input_loop(prompt, strip=True, required=True):
             if strip:
                 selection = selection.strip()
         except EOFError:
-            write('')
+            write('', stream=sys.stderr)
             sys.exit(EXIT_FAILURE)
         except KeyboardInterrupt:
-            write('')
+            write('', stream=sys.stderr)
+            write('KeyboardInterrupt', stream=sys.stderr)
             continue
         if required and not selection:
             continue
