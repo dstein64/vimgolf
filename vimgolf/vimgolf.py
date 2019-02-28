@@ -18,6 +18,7 @@ from vimgolf.html import (
     get_elements_by_classname,
     get_element_by_id,
     get_elements_by_tagname,
+    get_text,
     NodeType,
     parse_html,
 )
@@ -60,6 +61,9 @@ USER_HOME = os.path.expanduser('~')
 
 # Max number of listings by default for 'vimgolf list'
 LISTING_LIMIT = 10
+
+# Max number of leaders to show for 'vimgolf show'
+LEADER_LIMIT = 3
 
 LOG_ROTATE_COUNT = 10
 
@@ -541,31 +545,55 @@ def show(challenge_id):
             end_file += '\n'
         nodes = parse_html(page_response.body)
         content_element = get_element_by_id(nodes, 'content')
-        grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
-        h3_element = get_elements_by_tagname(grid_7_element.children, 'h3')[0]
-        name = join_lines(h3_element.children[0].children[0].data)
-        p_element = get_elements_by_tagname(grid_7_element.children, 'p')[0]
-        description = join_lines(p_element.children[0].data)
+        content_grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
+        name_h3 = get_elements_by_tagname(content_grid_7_element.children, 'h3')[0]
+        name = join_lines(get_text([name_h3]).strip())
+        description_p_element = get_elements_by_tagname(content_grid_7_element.children, 'p')[0]
+        description = join_lines(get_text([description_p_element]).strip())
+        content_grid_5_element = get_elements_by_classname(content_element.children, 'grid_5')[0]
+        Leader = namedtuple('Leader', 'username score')
+        leaders = []
+        leaderboard_divs = get_elements_by_tagname(content_grid_5_element.children, 'div')
+        for leaderboard_div in leaderboard_divs:
+            user_h6 = get_elements_by_tagname(leaderboard_div.children, 'h6')[0]
+            username_anchor = get_elements_by_tagname(user_h6.children, 'a')[1]
+            username = get_text([username_anchor]).strip()
+            if username.startswith('@'):
+                username = username[1:]
+            score_div = get_elements_by_tagname(leaderboard_div.children, 'div')[0]
+            score = int(get_text([score_div]).strip())
+            leader = Leader(username=username, score=score)
+            leaders.append(leader)
+        separator = '-' * 50
+        write(separator)
+        write('{} ('.format(name), end=None)
+        write(challenge_id, color='yellow', end=None)
+        write(')')
+        write(separator)
+        write(page_url)
+        write(separator)
+        write('Leaderboard', color='green')
+        if leaders:
+            for leader in leaders[:LEADER_LIMIT]:
+                write('{} {}'.format(leader.username.ljust(15), leader.score))
+            if len(leaders) > LEADER_LIMIT:
+                write('...')
+        else:
+            write('no entries yet', color='yellow')
+        write(separator)
+        write(description)
+        write(separator)
+        write('Start File', color='green')
+        write(start_file, end=None)
+        write(separator)
+        write('End File', color='green')
+        write(end_file, end=None)
+        write(separator)
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
         return Status.FAILURE
-
-    separator = '-' * 50
-    write(separator)
-    write('{} ('.format(name), end=None)
-    write(challenge_id, color='yellow', end=None)
-    write(')')
-    write(separator)
-    write(description)
-    write(separator)
-    write('Start File', color='green')
-    write(start_file, end=None)
-    write(separator)
-    write('End File', color='green')
-    write(end_file, end=None)
-    write(separator)
 
     return Status.SUCCESS
 
