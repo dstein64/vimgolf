@@ -323,11 +323,13 @@ def play(challenge, workspace):
     if sys.platform == 'win32':
         vim_name = vim_name.rstrip('.exe')
 
-    # On Windows, nvim-qt doesn't support --nofork, and vimgolf freezes on nvim's exit
-    if vim_name.startswith('nvim') and sys.platform == 'win32':
-        logger.error('nvim not supported on Windows')
-        write('nvim is not supported on Windows', stream=sys.stderr, color='red')
-        return Status.FAILURE
+    # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
+    # Issue a warning as opposed to failing, since this may change.
+    if vim_name == 'nvim-qt' and sys.platform == 'win32':
+        write('vimgolf with nvim-qt on Windows may not function properly', color='red')
+        write('If there are issues, please try using a different version of vim', color='yellow')
+        if not confirm('Try to play with nvim-qt?'):
+            return Status.FAILURE
 
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
@@ -367,7 +369,17 @@ def play(challenge, workspace):
             '-W', logfile, # keylog file (overwrites existing)
         ])
         play_args.append(infile)
-        subprocess.run(play_args)
+        try:
+            subprocess.run(play_args, check=True)
+        except Exception:
+            logger.exception('{} execution failed'.format(vim_name))
+            write('The execution of {} has failed'.format(vim_name), stream=sys.stderr, color='red')
+            return Status.FAILURE
+
+        # On Windows, vimgolf freezes when reading input after nvim's exit.
+        # This shell'd out effective no-op works-around the issue
+        if vim_name == 'nvim' and sys.platform == 'win32':
+            subprocess.run(['rem'], shell=True)
 
         correct = filecmp.cmp(infile, outfile)
         with open(logfile, 'rb') as _f:
@@ -485,7 +497,7 @@ def put(challenge_id):
             message = 'vimgolf=={} is not compliant with vimgolf.com'.format(__version__)
             write(message, stream=sys.stderr, color='red')
             write('Uploading to vimgolf.com is disabled', stream=sys.stderr, color='red')
-            write('vimgolf may not function properly', color='yellow')
+            write('vimgolf may not function properly', color='red')
             try:
                 client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
                 api_version = StrictVersion(challenge_spec['client'])
