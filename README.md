@@ -46,7 +46,6 @@ $ python3 -m vimgolf
 #### Commands
 
 ```text
-Commands:
   vimgolf [help]                # display this help and exit
   vimgolf config [API_KEY]      # configure your VimGolf credentials
   vimgolf local INFILE OUTFILE  # launch local challenge
