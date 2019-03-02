@@ -1,6 +1,5 @@
 from collections import namedtuple
 import concurrent.futures
-import copy
 from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
@@ -328,8 +327,25 @@ def play(challenge, workspace):
     if vim_name == 'nvim-qt' and sys.platform == 'win32':
         write('vimgolf with nvim-qt on Windows may not function properly', color='red')
         write('If there are issues, please try using a different version of vim', color='yellow')
-        if not confirm('Try to play with nvim-qt?'):
+        if not confirm('Continue trying to play?'):
             return Status.FAILURE
+
+    def vim(args, **call_kwargs):
+        # Configure args used by all vim invocations (for both playing and diffing)
+        vim_args = [GOLF_VIM]
+        # Add --nofork so gvim and nvim-qt don't return immediately
+        # Add special-case handling since nvim doesn't accept that option.
+        if vim_name != 'nvim':
+            vim_args.append('--nofork')
+        # For nvim-qt, options after '--' are passed to nvim.
+        if vim_name == 'nvim-qt':
+            vim_args.append('--')
+        vim_args.extend(args)
+        subprocess.run(vim_args, **call_kwargs)
+        # On Windows, vimgolf freezes when reading input after nvim's exit.
+        # For an unknown reason, shell'ing out an effective no-op works-around the issue
+        if vim_name == 'nvim' and sys.platform == 'win32':
+            os.system('')
 
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
@@ -346,19 +362,8 @@ def play(challenge, workspace):
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        # Configure args used by all vim invocations (for both playing and diffing)
-        vim_args = [GOLF_VIM]
-        # Add --nofork so gvim and nvim-qt don't return immediately
-        # Add special-case handling since nvim doesn't accept that option.
-        if vim_name != 'nvim':
-            vim_args.append('--nofork')
-        # For nvim-qt, options after '--' are passed to nvim.
-        if vim_name == 'nvim-qt':
-            vim_args.append('--')
-
-        play_args = copy.copy(vim_args)
         vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-        play_args.extend([
+        play_args = [
             '-Z',          # restricted mode, utilities not allowed
             '-n',          # no swap file, memory only editing
             '--noplugin',  # no plugins
@@ -367,19 +372,14 @@ def play(challenge, workspace):
             '-u', vimrc,   # vimgolf .vimrc
             '-U', 'NONE',  # don't load .gvimrc
             '-W', logfile, # keylog file (overwrites existing)
-        ])
-        play_args.append(infile)
+            infile,
+        ]
         try:
-            subprocess.run(play_args, check=True)
+            vim(play_args, check=True)
         except Exception:
             logger.exception('{} execution failed'.format(vim_name))
             write('The execution of {} has failed'.format(vim_name), stream=sys.stderr, color='red')
             return Status.FAILURE
-
-        # On Windows, vimgolf freezes when reading input after nvim's exit.
-        # This shell'd out effective no-op works-around the issue
-        if vim_name == 'nvim' and sys.platform == 'win32':
-            subprocess.run(['rem'], shell=True)
 
         correct = filecmp.cmp(infile, outfile)
         with open(logfile, 'rb') as _f:
@@ -428,9 +428,8 @@ def play(challenge, workspace):
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
             elif selection == 'd':
-                diff_args = copy.copy(vim_args)
-                diff_args.extend(['-d', '-n', infile, outfile])
-                subprocess.run(diff_args)
+                diff_args = ['-d', '-n', infile, outfile]
+                vim(diff_args)
             elif selection == 'w':
                 upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
                 if upload_status == Status.SUCCESS:
