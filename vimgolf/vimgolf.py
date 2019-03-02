@@ -1,5 +1,6 @@
 from collections import namedtuple
 import concurrent.futures
+import copy
 from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
@@ -44,11 +45,30 @@ EXIT_FAILURE = 1
 
 
 # ************************************************************
+# * Environment
+# ************************************************************
+
+# Enable ANSI terminal colors on Windows
+if sys.platform == 'win32':
+    import ctypes
+    from ctypes import wintypes
+    kernel32 = ctypes.windll.kernel32
+    STD_OUTPUT_HANDLE = -11                  # https://docs.microsoft.com/en-us/windows/console/getstdhandle
+    STD_ERROR_HANDLE = -12                   # ditto
+    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x4 # https://docs.microsoft.com/en-us/windows/console/getconsolemode
+    for std_device in [STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]:
+        handle = kernel32.GetStdHandle(wintypes.DWORD(std_device))
+        old_console_mode = wintypes.DWORD()
+        kernel32.GetConsoleMode(handle, ctypes.byref(old_console_mode))
+        new_console_mode = wintypes.DWORD(ENABLE_VIRTUAL_TERMINAL_PROCESSING | old_console_mode.value)
+        kernel32.SetConsoleMode(handle, new_console_mode)
+
+
+# ************************************************************
 # * Configuration, Global Variables, and Logging
 # ************************************************************
 
 GOLF_HOST = os.environ.get('GOLF_HOST', 'https://www.vimgolf.com')
-GOLF_DIFF = os.environ.get('GOLF_DIFF', 'vim -d -n')
 GOLF_VIM = os.environ.get('GOLF_VIM', 'vim')
 
 USER_AGENT = 'vimgolf'
@@ -89,6 +109,7 @@ VIMGOLF_LOG_DIR_PATH = os.path.join(VIMGOLF_CACHE_PATH, 'log')
 os.makedirs(VIMGOLF_LOG_DIR_PATH, exist_ok=True)
 VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf.log')
 
+# TODO: this approach is problematic for multiple running instances of vimgolf
 rotation_pending = os.path.exists(VIMGOLF_LOG_PATH)
 logger = logging.getLogger('vimgolf')
 logger.setLevel(logging.DEBUG)
@@ -292,6 +313,22 @@ def upload_result(challenge_id, api_key, raw_keys):
 
 def play(challenge, workspace):
     logger.info('play(...)')
+
+    vim_path = find_executable(GOLF_VIM)
+    if not vim_path:
+        write('Unable to find "{}"'.format(GOLF_VIM), color='red')
+        write('Please update your PATH to include the directory with "{}"'.format(GOLF_VIM), color='red')
+        return Status.FAILURE
+    vim_name = os.path.basename(os.path.realpath(vim_path))
+    if sys.platform == 'win32':
+        vim_name = vim_name.rstrip('.exe')
+
+    # On Windows, nvim-qt doesn't support --nofork, and vimgolf freezes on nvim's exit
+    if vim_name.startswith('nvim') and sys.platform == 'win32':
+        logger.error('nvim not supported on Windows')
+        write('nvim is not supported on Windows', stream=sys.stderr, color='red')
+        return Status.FAILURE
+
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
         infile += challenge.in_extension
@@ -307,9 +344,19 @@ def play(challenge, workspace):
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        vim_args = GOLF_VIM.split()
+        # Configure args used by all vim invocations (for both playing and diffing)
+        vim_args = [GOLF_VIM]
+        # Add --nofork so gvim and nvim-qt don't return immediately
+        # Add special-case handling since nvim doesn't accept that option.
+        if vim_name != 'nvim':
+            vim_args.append('--nofork')
+        # For nvim-qt, options after '--' are passed to nvim.
+        if vim_name == 'nvim-qt':
+            vim_args.append('--')
+
+        play_args = copy.copy(vim_args)
         vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-        vim_args += [
+        play_args.extend([
             '-Z',          # restricted mode, utilities not allowed
             '-n',          # no swap file, memory only editing
             '--noplugin',  # no plugins
@@ -318,15 +365,9 @@ def play(challenge, workspace):
             '-u', vimrc,   # vimgolf .vimrc
             '-U', 'NONE',  # don't load .gvimrc
             '-W', logfile, # keylog file (overwrites existing)
-        ]
-        # Add special handling for nofork, since nvim doesn't accept that option.
-        vim_name = os.path.basename(os.path.realpath(find_executable(vim_args[0])))
-        if vim_name != 'nvim':
-            # so gvim and nvim-qt don't return immediately
-            vim_args.append('--nofork')
-
-        vim_args.append(infile)
-        subprocess.run(vim_args)
+        ])
+        play_args.append(infile)
+        subprocess.run(play_args)
 
         correct = filecmp.cmp(infile, outfile)
         with open(logfile, 'rb') as _f:
@@ -375,7 +416,8 @@ def play(challenge, workspace):
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
             elif selection == 'd':
-                diff_args = GOLF_DIFF.split() + [infile, outfile]
+                diff_args = copy.copy(vim_args)
+                diff_args.extend(['-d', '-n', infile, outfile])
                 subprocess.run(diff_args)
             elif selection == 'w':
                 upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
