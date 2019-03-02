@@ -348,7 +348,7 @@ def play(challenge, workspace):
 
         # Configure args used by all vim invocations (for both playing and diffing)
         vim_args = [GOLF_VIM]
-        # Add --nofork so gvim and nvim-qt don't return immediately
+        # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
         # Add special-case handling since nvim doesn't accept that option.
         if vim_name != 'nvim':
             vim_args.append('--nofork')
