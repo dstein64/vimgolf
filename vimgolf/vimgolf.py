@@ -330,7 +330,7 @@ def play(challenge, workspace):
         if not confirm('Continue trying to play?'):
             return Status.FAILURE
 
-    def vim(args, **call_kwargs):
+    def vim(args, **run_kwargs):
         # Configure args used by all vim invocations (for both playing and diffing)
         vim_args = [GOLF_VIM]
         # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
@@ -341,7 +341,7 @@ def play(challenge, workspace):
         if vim_name == 'nvim-qt':
             vim_args.append('--')
         vim_args.extend(args)
-        subprocess.run(vim_args, **call_kwargs)
+        subprocess.run(vim_args, **run_kwargs)
         # On Windows, vimgolf freezes when reading input after nvim's exit.
         # For an unknown reason, shell'ing out an effective no-op works-around the issue
         if vim_name == 'nvim' and sys.platform == 'win32':
