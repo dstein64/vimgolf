@@ -110,7 +110,8 @@ VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf.log')
 
 logger = None
 
-
+# TODO: implement a log rotation scheme that avoids the parallel execution issue.
+#       Revert back to no init_logger() function.
 def init_logger():
     global logger
     logger = logging.getLogger('vimgolf')
