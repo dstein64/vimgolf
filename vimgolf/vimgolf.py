@@ -292,6 +292,7 @@ Challenge = namedtuple('Challenge', [
 
 
 def upload_result(challenge_id, api_key, raw_keys):
+    logger.info('upload_result(...)')
     status = Status.FAILURE
     try:
         url = urllib.parse.urljoin(GOLF_HOST, '/entry.json')
@@ -473,8 +474,8 @@ def local(infile, outfile):
 
 
 def put(challenge_id):
-    logger.info('put(%s)', challenge_id)
     challenge_id = expand_challenge_id(challenge_id)
+    logger.info('put(%s)', challenge_id)
     if not validate_challenge_id(challenge_id):
         show_challenge_id_error()
         return Status.FAILURE
@@ -577,9 +578,9 @@ def list_(page=None, limit=LISTING_LIMIT):
 
 
 def show(challenge_id):
+    challenge_id = expand_challenge_id(challenge_id)
     logger.info('show(%s)', challenge_id)
     try:
-        challenge_id = expand_challenge_id(challenge_id)
         if not validate_challenge_id(challenge_id):
             show_challenge_id_error()
             return Status.FAILURE
@@ -758,7 +759,10 @@ def main(argv=sys.argv):
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
         status = Status.FAILURE
 
-    return EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
+    exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
+    logger.info('exit({})'.format(exit_code))
+
+    return exit_code
 
 
 if __name__ == '__main__':
