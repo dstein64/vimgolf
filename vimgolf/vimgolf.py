@@ -1,9 +1,11 @@
 from collections import namedtuple
 import concurrent.futures
+import datetime
 from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
+import glob
 import json
 import logging.handlers
 import os
@@ -78,13 +80,16 @@ EXPANSION_PREFIX='+'
 
 USER_HOME = os.path.expanduser('~')
 
+TIMESTAMP = datetime.datetime.utcnow().timestamp()
+
 # Max number of listings by default for 'vimgolf list'
 LISTING_LIMIT = 10
 
 # Max number of leaders to show for 'vimgolf show'
 LEADER_LIMIT = 3
 
-LOG_ROTATE_COUNT = 10
+# Max number of existing logs to retain
+LOG_LIMIT = 10
 
 # Max number of parallel web requests.
 # As of 2018, most browsers use a max of six connections per hostname.
@@ -106,25 +111,32 @@ os.makedirs(VIMGOLF_CACHE_PATH, exist_ok=True)
 
 VIMGOLF_LOG_DIR_PATH = os.path.join(VIMGOLF_CACHE_PATH, 'log')
 os.makedirs(VIMGOLF_LOG_DIR_PATH, exist_ok=True)
-VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf.log')
+VIMGOLF_LOG_FILENAME = 'vimgolf-{}-{}.log'.format(TIMESTAMP, os.getpid())
+VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, VIMGOLF_LOG_FILENAME)
 
-logger = None
+logger = logging.getLogger('vimgolf')
 
-# TODO: implement a log rotation scheme that avoids the parallel execution issue.
-#       Revert back to no init_logger() function.
-def init_logger():
-    global logger
-    logger = logging.getLogger('vimgolf')
-    log_exists = os.path.exists(VIMGOLF_LOG_PATH)
-    logger.setLevel(logging.DEBUG)
-    handler = logging.handlers.RotatingFileHandler(
-        VIMGOLF_LOG_PATH, backupCount=LOG_ROTATE_COUNT)
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    if log_exists:
-        handler.doRollover()
+# Initialize logger
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(VIMGOLF_LOG_PATH, mode='w')
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.info('vimgolf started')
+
+# Clean stale logs
+logger.info('cleaning stale logs')
+existing_logs_glob = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf-*-*.log')
+existing_logs = glob.glob(existing_logs_glob)
+log_sort_key = lambda x: float(os.path.basename(x).split('-')[1])
+stale_existing_logs = sorted(existing_logs, key=log_sort_key)[:-LOG_LIMIT]
+for log in stale_existing_logs:
+    logger.info('deleting stale log: {}'.format(log))
+    try:
+        os.remove(log)
+    except Exception:
+        logger.exception('error deleting stale log: {}'.format(log))
 
 
 # ************************************************************
@@ -676,31 +688,11 @@ def config(api_key=None):
     return Status.SUCCESS
 
 
-def debug():
-    last_log = '{}.1'.format(VIMGOLF_LOG_PATH)
-    if os.path.exists(last_log):
-        with open(last_log, 'r') as f:
-            write(f.read(), end=None)
-    return Status.SUCCESS
-
-
 # ************************************************************
 # * Command Line Interface
 # ************************************************************
 
 def main(argv=sys.argv):
-    # Log rotation renames files. In case the file is already open by another vimgolf
-    # process, check if this is supported on the host platform.s
-    if os.path.exists(VIMGOLF_LOG_PATH):
-        try:
-            os.rename(VIMGOLF_LOG_PATH, VIMGOLF_LOG_PATH)
-        except Exception:
-            write('Error launching vimgolf', stream=sys.stdout, color='red')
-            error_message = 'Running vimgolf sessions in parallel is not supported on this platform'
-            write(error_message, stream=sys.stdout, color='red')
-            sys.exit(EXIT_FAILURE)
-    init_logger()
-    logger.info('vimgolf started')
     logger.info('main(%s)', argv)
     if len(argv) < 2:
         command = 'help'
@@ -768,9 +760,6 @@ def main(argv=sys.argv):
     elif command == 'version':
         write(__version__)
         status = Status.SUCCESS
-    elif command == 'debug':
-        # Undocumented command for printing last log file
-        status = debug()
     else:
         write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
         status = Status.FAILURE
