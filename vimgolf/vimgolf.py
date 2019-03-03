@@ -108,18 +108,22 @@ VIMGOLF_LOG_DIR_PATH = os.path.join(VIMGOLF_CACHE_PATH, 'log')
 os.makedirs(VIMGOLF_LOG_DIR_PATH, exist_ok=True)
 VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf.log')
 
-# TODO: this approach is problematic for multiple running instances of vimgolf
-rotation_pending = os.path.exists(VIMGOLF_LOG_PATH)
-logger = logging.getLogger('vimgolf')
-logger.setLevel(logging.DEBUG)
-handler = logging.handlers.RotatingFileHandler(
-    VIMGOLF_LOG_PATH, backupCount=LOG_ROTATE_COUNT)
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-if rotation_pending:
-    handler.doRollover()
+logger = None
+
+
+def init_logger():
+    global logger
+    logger = logging.getLogger('vimgolf')
+    log_exists = os.path.exists(VIMGOLF_LOG_PATH)
+    logger.setLevel(logging.DEBUG)
+    handler = logging.handlers.RotatingFileHandler(
+        VIMGOLF_LOG_PATH, backupCount=LOG_ROTATE_COUNT)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    if log_exists:
+        handler.doRollover()
 
 
 # ************************************************************
@@ -684,6 +688,17 @@ def debug():
 # ************************************************************
 
 def main(argv=sys.argv):
+    # Log rotation renames files. In case the file is already open by another vimgolf
+    # process, check if this is supported on the host platform.s
+    if os.path.exists(VIMGOLF_LOG_PATH):
+        try:
+            os.rename(VIMGOLF_LOG_PATH, VIMGOLF_LOG_PATH)
+        except Exception:
+            write('Error launching vimgolf', stream=sys.stdout, color='red')
+            error_message = 'Running vimgolf sessions in parallel is not supported on this platform'
+            write(error_message, stream=sys.stdout, color='red')
+            sys.exit(EXIT_FAILURE)
+    init_logger()
     logger.info('vimgolf started')
     logger.info('main(%s)', argv)
     if len(argv) < 2:
