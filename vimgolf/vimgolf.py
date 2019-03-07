@@ -1,7 +1,6 @@
 from collections import namedtuple
 import concurrent.futures
 import datetime
-from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
@@ -9,6 +8,7 @@ import glob
 import json
 import logging.handlers
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -230,6 +230,49 @@ def confirm(prompt):
     return True
 
 
+def find_executable_unix(executable):
+    if os.path.isfile(executable):
+        return executable
+    paths = os.environ.get('PATH', os.defpath).split(os.pathsep)
+    for p in paths:
+        f = os.path.join(p, executable)
+        if os.path.isfile(f):
+            return f
+    return None
+
+
+def find_executable_win32(executable):
+    """Emulates how cmd.exe seemingly searches for executables."""
+    def fixcase(p):
+        return str(Path(p).resolve())
+    pathext = os.environ.get('PATHEXT', '.EXE')
+    pathexts = list(x.upper() for x in pathext.split(os.pathsep))
+    _, ext = os.path.splitext(executable)
+    if os.path.isfile(executable) and ext.upper() in pathexts:
+        return fixcase(executable)
+    for x in pathexts:
+        if os.path.isfile(executable + x):
+            return fixcase(executable + x)
+    if executable != os.path.basename(executable):
+        return None
+    paths = os.environ.get('PATH', os.defpath).split(os.pathsep)
+    for p in paths:
+        candidate = os.path.join(p, executable)
+        if os.path.isfile(candidate) and ext.upper() in pathexts:
+            return fixcase(candidate)
+        for x in pathexts:
+            if os.path.isfile(candidate + x):
+                return fixcase(candidate + x)
+    return None
+
+
+def find_executable(executable):
+    if sys.platform == 'win32':
+        return find_executable_win32(executable)
+    else:
+        return find_executable_unix(executable)
+
+
 # ************************************************************
 # * Core
 # ************************************************************
@@ -337,8 +380,15 @@ def play(challenge, workspace):
         write('Please update your PATH to include the directory with "{}"'.format(GOLF_VIM), color='red')
         return Status.FAILURE
     vim_name = os.path.basename(os.path.realpath(vim_path))
+
     if sys.platform == 'win32':
-        vim_name = vim_name.rstrip('.exe')
+        # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'
+        base, ext = os.path.splitext(vim_name)
+        pathexts = os.environ.get('PATHEXT', '.EXE').split(os.pathsep)
+        for pathext in pathexts:
+            if ext.upper() == pathext.upper():
+                vim_name = base
+                break
 
     # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
     # Issue a warning as opposed to failing, since this may change.
@@ -350,7 +400,7 @@ def play(challenge, workspace):
 
     def vim(args, **run_kwargs):
         # Configure args used by all vim invocations (for both playing and diffing)
-        vim_args = [GOLF_VIM]
+        vim_args = [vim_path]
         # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
         # Add special-case handling since nvim doesn't accept that option.
         if vim_name != 'nvim':
@@ -395,8 +445,8 @@ def play(challenge, workspace):
         try:
             vim(play_args, check=True)
         except Exception:
-            logger.exception('{} execution failed'.format(vim_name))
-            write('The execution of {} has failed'.format(vim_name), stream=sys.stderr, color='red')
+            logger.exception('{} execution failed'.format(GOLF_VIM))
+            write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
             return Status.FAILURE
 
         correct = filecmp.cmp(infile, outfile)
