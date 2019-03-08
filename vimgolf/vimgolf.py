@@ -400,6 +400,9 @@ def play(challenge, workspace):
 
     def vim(args, **run_kwargs):
         # Configure args used by all vim invocations (for both playing and diffing)
+        # 'vim_path' is used instead of GOLF_VIM to handle 'vim.bat' on the PATH.
+        # subprocess.run would not launch vim.bat with GOLF_VIM == 'vim', but 'find_executable'
+        # will return the full path to vim.bat in that case.
         vim_args = [vim_path]
         # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
         # Add special-case handling since nvim doesn't accept that option.
