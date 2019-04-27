@@ -38,6 +38,7 @@ IGNORED_KEYSTROKES = {
     b'\xfd\x35', # (35) KE_IGNORE
     # Incidentally, CursorHold is triggered on GVIM move window
     b'\xfd\x60', # (96) KE_CURSORHOLD Move Window (GVIM)
+    b'\xfd\x61', # (97) KE_NOP
     b'\xfd\x62', # (98) KE_FOCUSGAINED Focus Gained (GVIM)
     b'\xfd\x63', # (99) KE_FOCUSLOST Focus Lost (GVIM)
 }
