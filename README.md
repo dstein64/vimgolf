@@ -69,4 +69,4 @@ License
 
 The source code has an [MIT License](https://en.wikipedia.org/wiki/MIT_License).
 
-See [LICENSE](LICENSE).
+See [LICENSE](https://github.com/dstein64/vimgolf/blob/master/LICENSE).
