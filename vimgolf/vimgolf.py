@@ -289,6 +289,9 @@ def find_executable(executable):
         return find_executable_unix(executable)
 
 
+bool_to_mark = lambda m: '✅' if m else '❌'
+
+
 # ************************************************************
 # * Core
 # ************************************************************
@@ -424,6 +427,16 @@ class Challenge:
             })))
 
     @property
+    def answers(self):
+        if not os.path.exists(self.answers_path):
+            return []
+        result = []
+        with open(self.answers_path) as f:
+            for raw_answer in f:
+                result.append(json.loads(raw_answer))
+        return sorted(result, key=lambda a: a['timestamp'])
+
+    @property
     def metadata(self):
         if not os.path.exists(self.metadata_path):
             return {}
@@ -431,20 +444,16 @@ class Challenge:
             return json.load(f)
 
     def update_metadata(self, name=None, description=None):
-        if not os.path.exists(self.answers_path):
-            return
         uploaded = 0
         correct = 0
         stub_score = 10 ** 10
         best_score = stub_score
-        with open(self.answers_path) as f:
-            for raw_answer in f:
-                answer = json.loads(raw_answer)
-                if answer['uploaded']:
-                    uploaded += 1
-                if answer['correct']:
-                    correct += 1
-                    best_score = min(best_score, answer['score'])
+        for answer in self.answers:
+            if answer['uploaded']:
+                uploaded += 1
+            if answer['correct']:
+                correct += 1
+                best_score = min(best_score, answer['score'])
         current_metadata = self.metadata
         current_metadata.update({
             'id': self.id,
@@ -770,7 +779,6 @@ def list_(page=None, limit=LISTING_LIMIT):
         return Status.FAILURE
 
     table_rows = [['#', 'Name', 'Entries', 'ID', 'Submitted', 'Score']]
-    bool_to_mark = lambda m: '✅'if m else '❌'
 
     for idx, listing in enumerate(listings):
         table_row = [
@@ -791,7 +799,7 @@ def list_(page=None, limit=LISTING_LIMIT):
     return Status.SUCCESS
 
 
-def show(challenge_id):
+def show(challenge_id, tracked=False):
     challenge_id = expand_challenge_id(challenge_id)
     logger.info('show(%s)', challenge_id)
     try:
@@ -861,6 +869,32 @@ def show(challenge_id):
         challenge = Challenge(challenge_id)
         challenge.update_metadata(name, description)
 
+        if tracked:
+            write('Stats', color='green')
+            metadata = challenge.metadata
+            write('Uploaded: {}'.format(metadata['uploaded']))
+            write('Correct Solutions: {}'.format(metadata['correct']))
+            write('Self Best Score: {}'.format(metadata['best_score']))
+            answers = challenge.answers
+            ignored_answers = {
+                'ZQ'
+            }
+            answer_rows = [['Keys', 'Correct', 'Submitted', 'Score', 'Timestamp']]
+            for answer in answers:
+                keys = ''.join(answer['keys'])
+                if keys in ignored_answers:
+                    continue
+                answer_row = [
+                    keys,
+                    bool_to_mark(answer['correct']),
+                    bool_to_mark(answer['uploaded']),
+                    answer['score'],
+                    answer['timestamp'],
+                ]
+                answer_rows.append(answer_row)
+            if len(answer_rows) > 1:
+                write(AsciiTable(answer_rows).table)
+
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
@@ -904,6 +938,7 @@ def exit_status(status):
 
 
 argument = click.argument
+option = click.option
 command = main.command
 
 
@@ -941,9 +976,10 @@ def list_cmd(spec):
 
 @command('show')
 @argument('challenge_id')
-def show_cmd(challenge_id):
+@option('-t', '--tracked', is_flag=True, help='Include tracked data')
+def show_cmd(challenge_id, tracked):
     """show vimgolf.com challenge"""
-    exit_status(show(challenge_id))
+    exit_status(show(challenge_id, tracked))
 
 
 @command('config')
