@@ -925,7 +925,7 @@ def put_cmd(challenge_id):
 @command('list')
 @argument('spec', default='')
 def list_cmd(spec):
-    """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT]"""
+    """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT])"""
     page_and_limit = spec
     kwargs = {}
     parts = page_and_limit.split(':')
