@@ -568,12 +568,13 @@ def play(challenge, workspace):
             else:
                 break
 
-        challenge.add_answer(
-            keys=keycode_reprs,
-            score=score,
-            correct=correct,
-            uploaded=uploaded,
-        )
+        if challenge.id:
+            challenge.add_answer(
+                keys=keycode_reprs,
+                score=score,
+                correct=correct,
+                uploaded=uploaded,
+            )
 
         if selection == 'q':
             break
