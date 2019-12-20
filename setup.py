@@ -23,6 +23,9 @@ setup(
         'Topic :: Games/Entertainment',
     ],
     description='A vimgolf client written in Python',
+    install_requires=[
+        'click>=7,<8',
+    ],
     entry_points={
         'console_scripts': ['vimgolf=vimgolf.vimgolf:main'],
     },

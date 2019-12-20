@@ -15,6 +15,8 @@ import tempfile
 import urllib.parse
 import urllib.request
 
+import click
+
 from vimgolf.html import (
     get_elements_by_classname,
     get_element_by_id,
@@ -886,86 +888,72 @@ def config(api_key=None):
 # * Command Line Interface
 # ************************************************************
 
-def main(argv=None):
-    argv = argv or sys.argv
-    logger.info('main(%s)', argv)
-    if len(argv) < 2:
-        command = 'help'
-    else:
-        command = argv[1]
+@click.group()
+def main():
+    pass
 
-    help_message = (
-        'Commands:\n'
-        '  vimgolf [help]                # display this help and exit\n'
-        '  vimgolf config [API_KEY]      # configure your vimgolf.com credentials\n'
-        '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
-        '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
-        '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
-        '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
-        '  vimgolf version               # display the version number'
-    )
 
-    if command == 'help':
-        write(help_message)
-        status = Status.SUCCESS
-    elif command == 'local':
-        if len(argv) != 4:
-            usage = 'Usage: "vimgolf local INFILE OUTFILE"'
-            write(usage, stream=sys.stderr, color='red')
-            status = Status.FAILURE
-        else:
-            status = local(argv[2], argv[3])
-    elif command == 'put':
-        if len(argv) != 3:
-            usage = 'Usage: "vimgolf put CHALLENGE_ID"'
-            write(usage, stream=sys.stderr, color='red')
-            status = Status.FAILURE
-        else:
-            status = put(argv[2])
-    elif command == 'list':
-        if not len(argv) in (2, 3):
-            usage = 'Usage: "vimgolf list [PAGE]"'
-            write(usage, stream=sys.stderr, color='red')
-            status = Status.FAILURE
-        else:
-            kwargs = {}
-            page_and_limit = argv[2] if len(argv) == 3 else ''
-            parts = page_and_limit.split(':')
-            try:
-                if len(parts) > 0 and parts[0]:
-                    kwargs['page'] = int(parts[0])
-                if len(parts) > 1:
-                    kwargs['limit'] = int(parts[1])
-            except Exception:
-                pass
-            status = list_(**kwargs)
-    elif command == 'show':
-        if len(argv) != 3:
-            usage = 'Usage: "vimgolf show CHALLENGE_ID"'
-            write(usage, stream=sys.stderr, color='red')
-            status = Status.FAILURE
-        else:
-            status = show(argv[2])
-    elif command == 'config':
-        if not len(argv) in (2, 3):
-            usage = 'Usage: "vimgolf config [API_KEY]"'
-            write(usage, stream=sys.stderr, color='red')
-            status = Status.FAILURE
-        else:
-            api_key = argv[2] if len(argv) == 3 else None
-            status = config(api_key)
-    elif command == 'version':
-        write(__version__)
-        status = Status.SUCCESS
-    else:
-        write('Unknown command: {}'.format(command), stream=sys.stderr, color='red')
-        status = Status.FAILURE
-
+def exit_status(status):
     exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
-    logger.info('exit({})'.format(exit_code))
+    sys.exit(exit_code)
 
-    return exit_code
+
+argument = click.argument
+command = main.command
+
+
+@command('local')
+@argument('in_file')
+@argument('out_file')
+def local_cmd(in_file, out_file):
+    """launch local challenge """
+    exit_status(local(in_file, out_file))
+
+
+@command('put')
+@argument('challenge_id')
+def put_cmd(challenge_id):
+    """launch vimgolf.com challenge"""
+    exit_status(put(challenge_id))
+
+
+@command('list')
+@argument('spec', default='')
+def list_cmd(spec):
+    """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT]"""
+    page_and_limit = spec
+    kwargs = {}
+    parts = page_and_limit.split(':')
+    try:
+        if len(parts) > 0 and parts[0]:
+            kwargs['page'] = int(parts[0])
+        if len(parts) > 1:
+            kwargs['limit'] = int(parts[1])
+    except Exception:
+        pass
+    exit_status(list_(**kwargs))
+
+
+@command('show')
+@argument('challenge_id')
+def show_cmd(challenge_id):
+    """show vimgolf.com challenge"""
+    exit_status(show(challenge_id))
+
+
+@command('config')
+@argument('api_key', default='')
+def config_cmd(api_key):
+    """configure your vimgolf.com credentials"""
+    exit_status(config(api_key or None))
+
+
+@command('version')
+def version_cmd():
+    """display the version number"""
+    click.echo(__version__)
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    main()
+
