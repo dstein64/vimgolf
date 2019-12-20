@@ -1,7 +1,6 @@
 from collections import namedtuple
 import concurrent.futures
 import datetime
-from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
 import glob
@@ -30,10 +29,9 @@ from vimgolf.keys import (
     parse_keycodes,
 )
 
-
 version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
-with open(version_txt, 'r') as f:
-    __version__ = f.read().strip()
+with open(version_txt, 'r') as vf:
+    __version__ = vf.read().strip()
 
 
 class Status(Enum):
@@ -54,9 +52,9 @@ if sys.platform == 'win32':
     import ctypes
     from ctypes import wintypes
     kernel32 = ctypes.windll.kernel32
-    STD_OUTPUT_HANDLE = -11                  # https://docs.microsoft.com/en-us/windows/console/getstdhandle
-    STD_ERROR_HANDLE = -12                   # ditto
-    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x4 # https://docs.microsoft.com/en-us/windows/console/getconsolemode
+    STD_OUTPUT_HANDLE = -11                   # https://docs.microsoft.com/en-us/windows/console/getstdhandle
+    STD_ERROR_HANDLE = -12                    # ditto
+    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x4  # https://docs.microsoft.com/en-us/windows/console/getconsolemode
     for std_device in [STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]:
         handle = kernel32.GetStdHandle(wintypes.DWORD(std_device))
         old_console_mode = wintypes.DWORD()
@@ -76,7 +74,7 @@ USER_AGENT = 'vimgolf'
 
 RUBY_CLIENT_VERSION_COMPLIANCE = '0.4.8'
 
-EXPANSION_PREFIX='+'
+EXPANSION_PREFIX = '+'
 
 USER_HOME = os.path.expanduser('~')
 
@@ -95,15 +93,19 @@ LOG_LIMIT = 10
 # As of 2018, most browsers use a max of six connections per hostname.
 MAX_REQUEST_WORKERS = 6
 
+VIMRC_PATH = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+
 CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
 VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
 VIMGOLF_API_KEY_FILENAME = 'api_key'
+VIMGOLF_API_KEY_PATH = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
 
 DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(USER_HOME, '.local', 'share'))
 VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
 VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
+VIMGOLF_ID_LOOKUP_PATH = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
 
 CACHE_HOME = os.environ.get('XDG_CACHE_HOME', os.path.join(USER_HOME, '.cache'))
 VIMGOLF_CACHE_PATH = os.path.join(CACHE_HOME, 'vimgolf')
@@ -154,9 +156,12 @@ def http_request(url, data=None):
     except Exception:
         charset = 'utf-8'
     body = response.read().decode(charset)
-    output = HttpResponse(
-        code=response.code, msg=response.msg, headers=response.getheaders(), body=body)
-    return output
+    return HttpResponse(
+        code=response.code,
+        msg=response.msg,
+        headers=response.getheaders(),
+        body=body
+    )
 
 
 def join_lines(string):
@@ -205,6 +210,9 @@ def input_loop(prompt, strip=True, required=True):
             selection = input(prompt)
             if strip:
                 selection = selection.strip()
+            if required and not selection:
+                continue
+            return selection
         except EOFError:
             write('', stream=sys.stderr)
             sys.exit(EXIT_FAILURE)
@@ -212,10 +220,6 @@ def input_loop(prompt, strip=True, required=True):
             write('', stream=sys.stderr)
             write('KeyboardInterrupt', stream=sys.stderr)
             continue
-        if required and not selection:
-            continue
-        break
-    return selection
 
 
 def confirm(prompt):
@@ -243,8 +247,8 @@ def find_executable_unix(executable):
 
 def find_executable_win32(executable):
     """Emulates how cmd.exe seemingly searches for executables."""
-    def fixcase(p):
-        return str(Path(p).resolve())
+    def fixcase(path):
+        return str(Path(path).resolve())
     pathext = os.environ.get('PATHEXT', '.EXE')
     pathexts = list(x.upper() for x in pathext.split(os.pathsep))
     _, ext = os.path.splitext(executable)
@@ -291,17 +295,15 @@ def validate_api_key(api_key):
 
 
 def get_api_key():
-    api_key_path = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
-    if not os.path.exists(api_key_path):
+    if not os.path.exists(VIMGOLF_API_KEY_PATH):
         return None
-    with open(api_key_path, 'r') as f:
+    with open(VIMGOLF_API_KEY_PATH, 'r') as f:
         api_key = f.read()
         return api_key
 
 
 def set_api_key(api_key):
-    api_key_path = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
-    with open(api_key_path, 'w') as f:
+    with open(VIMGOLF_API_KEY_PATH, 'w') as f:
         f.write(api_key)
 
 
@@ -316,17 +318,15 @@ def show_api_key_error():
 
 
 def get_id_lookup():
-    id_lookup_path = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
     id_lookup = {}
-    if os.path.exists(id_lookup_path):
-        with open(id_lookup_path, 'r') as f:
+    if os.path.exists(VIMGOLF_ID_LOOKUP_PATH):
+        with open(VIMGOLF_ID_LOOKUP_PATH, 'r') as f:
             id_lookup = json.load(f)
     return id_lookup
 
 
 def set_id_lookup(id_lookup):
-    id_lookup_path = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
-    with open(id_lookup_path, 'w') as f:
+    with open(VIMGOLF_ID_LOOKUP_PATH, 'w') as f:
         json.dump(id_lookup, f, indent=2)
 
 
@@ -433,16 +433,16 @@ def play(challenge, workspace):
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+        vimrc = VIMRC_PATH
         play_args = [
-            '-Z',          # restricted mode, utilities not allowed
-            '-n',          # no swap file, memory only editing
-            '--noplugin',  # no plugins
-            '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-            '+0',          # start on line 0
-            '-u', vimrc,   # vimgolf .vimrc
-            '-U', 'NONE',  # don't load .gvimrc
-            '-W', logfile, # keylog file (overwrites existing)
+            '-Z',           # restricted mode, utilities not allowed
+            '-n',           # no swap file, memory only editing
+            '--noplugin',   # no plugins
+            '-i', 'NONE',   # don't load .viminfo (e.g., has saved macros, etc.)
+            '+0',           # start on line 0
+            '-u', vimrc,    # vimgolf .vimrc
+            '-U', 'NONE',   # don't load .gvimrc
+            '-W', logfile,  # keylog file (overwrites existing)
             infile,
         ]
         try:
@@ -569,6 +569,7 @@ def put(challenge_id):
             write('Uploading to vimgolf.com is disabled', stream=sys.stderr, color='red')
             write('vimgolf may not function properly', color='red')
             try:
+                from distutils.version import StrictVersion
                 client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
                 api_version = StrictVersion(challenge_spec['client'])
                 action = 'upgrade' if api_version > client_compliance_version else 'downgrade'
@@ -745,7 +746,8 @@ def config(api_key=None):
 # * Command Line Interface
 # ************************************************************
 
-def main(argv=sys.argv):
+def main(argv=None):
+    argv = argv or sys.argv
     logger.info('main(%s)', argv)
     if len(argv) < 2:
         command = 'help'
@@ -790,8 +792,10 @@ def main(argv=sys.argv):
             page_and_limit = argv[2] if len(argv) == 3 else ''
             parts = page_and_limit.split(':')
             try:
-                if len(parts) > 0 and parts[0]: kwargs['page'] = int(parts[0])
-                if len(parts) > 1: kwargs['limit'] = int(parts[1])
+                if len(parts) > 0 and parts[0]:
+                    kwargs['page'] = int(parts[0])
+                if len(parts) > 1:
+                    kwargs['limit'] = int(parts[1])
             except Exception:
                 pass
             status = list_(**kwargs)
@@ -824,4 +828,4 @@ def main(argv=sys.argv):
 
 
 if __name__ == '__main__':
-    sys.exit(sys.exit(main(sys.argv)))
+    sys.exit(main(sys.argv))

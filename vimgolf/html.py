@@ -2,6 +2,7 @@ from enum import Enum
 import html.parser
 from typing import Iterable
 
+
 class NodeType(Enum):
     ELEMENT = 1
     TEXT = 2
@@ -98,9 +99,9 @@ class HTMLParser(html.parser.HTMLParser):
         self.nodes.append(text_node)
 
 
-def parse_html(html: str):
+def parse_html(raw_html: str):
     parser = HTMLParser()
-    parser.feed(html)
+    parser.feed(raw_html)
     return parser.nodes
 
 

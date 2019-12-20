@@ -1,13 +1,14 @@
 """Maps keys recorded by vim to a printable representation"""
 
-def to_bytes(x):
+
+def to_bytes(kc):
     """Convert an integer to bytes."""
-    return x.to_bytes(2, 'big')
+    return kc.to_bytes(2, 'big')
 
 
-def to_int(x):
+def to_int(kc):
     """Convert bytes to an integer."""
-    return int(x.hex(), 16)
+    return int(kc.hex(), 16)
 
 
 # Vim records key presses using 1) a single byte or 2) a 0x80 byte
@@ -35,12 +36,12 @@ def parse_keycodes(raw_keys):
 
 # keystrokes that should not impact score (e.g., window focus)
 IGNORED_KEYSTROKES = {
-    b'\xfd\x35', # (35) KE_IGNORE
+    b'\xfd\x35',  # (35) KE_IGNORE
     # Incidentally, CursorHold is triggered on GVIM move window
-    b'\xfd\x60', # (96) KE_CURSORHOLD Move Window (GVIM)
-    b'\xfd\x61', # (97) KE_NOP
-    b'\xfd\x62', # (98) KE_FOCUSGAINED Focus Gained (GVIM)
-    b'\xfd\x63', # (99) KE_FOCUSLOST Focus Lost (GVIM)
+    b'\xfd\x60',  # (96) KE_CURSORHOLD Move Window (GVIM)
+    b'\xfd\x61',  # (97) KE_NOP
+    b'\xfd\x62',  # (98) KE_FOCUSGAINED Focus Gained (GVIM)
+    b'\xfd\x63',  # (99) KE_FOCUSLOST Focus Lost (GVIM)
 }
 
 _KEYCODE_REPR_LOOKUP = {}
@@ -213,6 +214,6 @@ def get_keycode_repr(keycode):
         key = _KEYCODE_REPR_LOOKUP[keycode]
     else:
         # Show unknown keycodes as hex codes surrounded by brackets.
-        key = ''.join('\\x{:02x}'.format(x) for x in keycode)
+        key = ''.join('\\x{:02x}'.format(kc) for kc in keycode)
         key = '[' + key + ']'
     return key
