@@ -104,8 +104,12 @@ VIMGOLF_API_KEY_PATH = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAM
 DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(USER_HOME, '.local', 'share'))
 VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
+
 VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
 VIMGOLF_ID_LOOKUP_PATH = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
+
+VIMGOLF_CHALLENGES_PATH = os.path.join(VIMGOLF_DATA_PATH, 'challenges')
+os.makedirs(VIMGOLF_CHALLENGES_PATH, exist_ok=True)
 
 CACHE_HOME = os.environ.get('XDG_CACHE_HOME', os.path.join(USER_HOME, '.cache'))
 VIMGOLF_CACHE_PATH = os.path.join(CACHE_HOME, 'vimgolf')
@@ -340,15 +344,62 @@ def get_challenge_url(challenge_id):
     return urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
 
 
-Challenge = namedtuple('Challenge', [
-    'in_text',
-    'out_text',
-    'in_extension',
-    'out_extension',
-    'id',
-    'compliant',
-    'api_key'
-])
+class Challenge:
+    def __init__(
+            self,
+            in_text,
+            out_text,
+            in_extension,
+            out_extension,
+            id,
+            compliant,
+            api_key):
+        self.in_text = in_text
+        self.out_text = out_text
+        self.in_extension = in_extension
+        self.out_extension = out_extension
+        self.id = id
+        self.compliant = compliant
+        self.api_key = api_key
+
+    @property
+    def dir(self):
+        return os.path.join(VIMGOLF_CHALLENGES_PATH, self.id)
+
+    @property
+    def spec_path(self):
+        return os.path.join(self.dir, 'spec.json')
+
+    @property
+    def in_path(self):
+        return os.path.join(self.dir, 'in{}'.format(self.in_extension))
+
+    @property
+    def out_path(self):
+        return os.path.join(self.dir, 'out{}'.format(self.out_extension))
+
+    @property
+    def answers_path(self):
+        return os.path.join(self.dir, 'answers.jsonl')
+
+    def save(self, spec):
+        os.makedirs(self.dir, exist_ok=True)
+        with open(self.in_path, 'w') as f:
+            f.write(self.in_text)
+        with open(self.out_path, 'w') as f:
+            f.write(self.out_text)
+        with open(self.spec_path, 'w') as f:
+            json.dump(spec, f)
+
+    def add_answer(self, keys, correct, score, uploaded):
+        with open(self.answers_path, 'a') as f:
+            f.write('{}\n'.format(json.dumps({
+                'keys': keys,
+                'correct': correct,
+                'score': score,
+                'uploaded': uploaded,
+                'timestamp': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+            })))
 
 
 def upload_result(challenge_id, api_key, raw_keys):
@@ -480,6 +531,7 @@ def play(challenge, workspace):
             write('Your score for this failed attempt:', color='red')
         write(score)
 
+        uploaded = False
         upload_eligible = challenge.id and challenge.compliant and challenge.api_key
 
         while True:
@@ -507,6 +559,7 @@ def play(challenge, workspace):
                     write('Uploaded entry!', color='green')
                     leaderboard_url = get_challenge_url(challenge.id)
                     write('View the leaderboard: {}'.format(leaderboard_url), color='green')
+                    uploaded = True
                     upload_eligible = False
                 else:
                     write('The entry upload has failed', stream=sys.stderr, color='red')
@@ -514,6 +567,14 @@ def play(challenge, workspace):
                     write(message, stream=sys.stderr, color='red')
             else:
                 break
+
+        challenge.add_answer(
+            keys=keycode_reprs,
+            score=score,
+            correct=correct,
+            uploaded=uploaded,
+        )
+
         if selection == 'q':
             break
         write('Retrying vimgolf challenge', color='yellow')
@@ -599,7 +660,9 @@ def put(challenge_id):
         out_extension=out_extension,
         id=challenge_id,
         compliant=compliant,
-        api_key=api_key)
+        api_key=api_key
+    )
+    challenge.save(spec=challenge_spec)
     with tempfile.TemporaryDirectory() as d:
         status = play(challenge, d)
 
