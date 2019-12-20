@@ -405,7 +405,7 @@ class Challenge:
                 'timestamp': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
             })))
 
-    def update_metadata(self):
+    def update_metadata(self, name=None, description=None):
         if not os.path.exists(self.answers_path):
             return
         uploaded = 0
@@ -420,12 +420,23 @@ class Challenge:
                 if answer['correct']:
                     correct += 1
                     best_score = min(best_score, answer['score'])
+        current_metadata = {}
+        if os.path.exists(self.metadata_path):
+            with open(self.metadata_path) as f:
+                current_metadata = json.load(f)
+        current_metadata.update({
+            'id': self.id,
+            'url': get_challenge_url(self.id),
+            'uploaded': uploaded,
+            'correct': correct,
+            'best_score': best_score if best_score != stub_score else -1,
+        })
+        if name:
+            current_metadata['name'] = name
+        if description:
+            current_metadata['description'] = description
         with open(self.metadata_path, 'w') as f:
-            json.dump({
-                'uploaded': uploaded,
-                'correct': correct,
-                'best_score': best_score if best_score != stub_score else -1
-            }, f)
+            json.dump(current_metadata, f)
 
 
 def upload_result(challenge_id, api_key, raw_keys):
@@ -805,6 +816,18 @@ def show(challenge_id):
         write('End File', color='green')
         write(end_file, end=None)
         write(separator)
+
+        challenge = Challenge(
+            id=challenge_id,
+            in_text=None,
+            out_text=None,
+            in_extension=None,
+            out_extension=None,
+            compliant=None,
+            api_key=None
+        )
+        challenge.update_metadata(name, description)
+
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
