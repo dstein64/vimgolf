@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 
 import click
+from terminaltables import AsciiTable
 
 from vimgolf.html import (
     get_elements_by_classname,
@@ -175,8 +176,7 @@ def join_lines(string):
     return ' '.join(lines)
 
 
-def write(string, end='\n', stream=None, color=None):
-    string = str(string)
+def maybe_colorize(string, stream, color=None):
     color_lookup = {
         'red':     '\033[31m',
         'green':   '\033[32m',
@@ -188,10 +188,16 @@ def write(string, end='\n', stream=None, color=None):
     end_color = '\033[0m'
     if color and color not in color_lookup:
         raise RuntimeError('Unavailable color: {}'.format(color))
-    if stream is None:
-        stream = sys.stdout
     if color and hasattr(stream, 'isatty') and stream.isatty():
         string = color_lookup[color] + string + end_color
+    return string
+
+
+def write(string, end='\n', stream=None, color=None):
+    string = str(string)
+    if stream is None:
+        stream = sys.stdout
+    string = maybe_colorize(string, stream, color)
     stream.write(string)
     if end is not None:
         stream.write(str(end))
@@ -725,7 +731,7 @@ def put(challenge_id):
 
 def list_(page=None, limit=LISTING_LIMIT):
     logger.info('list_(%s, %s)', page, limit)
-    Listing = namedtuple('Listing', 'id name n_entries is_stored uploaded correct score')
+    Listing = namedtuple('Listing', 'id name n_entries uploaded correct score')
     stored_challenges = get_stored_challenges()
     try:
         listings = []
@@ -753,7 +759,6 @@ def list_(page=None, limit=LISTING_LIMIT):
                 id=id_,
                 name=name,
                 n_entries=n_entries,
-                is_stored=bool(stored_metadata),
                 uploaded=stored_metadata.get('uploaded'),
                 correct=stored_metadata.get('correct'),
                 score=stored_metadata.get('best_score')
@@ -764,21 +769,21 @@ def list_(page=None, limit=LISTING_LIMIT):
         write('The challenge list retrieval has failed', stream=sys.stderr, color='red')
         return Status.FAILURE
 
+    table_rows = [['#', 'Name', 'Entries', 'ID', 'Submitted', 'Score']]
+    bool_to_mark = lambda m: '✅'if m else '❌'
+
     for idx, listing in enumerate(listings):
-        write('{}{} '.format(EXPANSION_PREFIX, idx + 1), end=None)
-        write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
-        write(listing.id, color='yellow', end=None)
-        write(')', end=None if listing.is_stored else '\n')
-        if listing.is_stored:
-            true_mark = '✅'
-            false_mark = '❌'
-            bool_to_mark = lambda m: true_mark if m else false_mark
-            write(' [', end=None)
-            write(bool_to_mark(listing.uploaded), end=None)
-            write(' {}'.format(
-                listing.score if listing.score and listing.score > 0 else 'N/A'
-            ), end=None)
-            write(']')
+        table_row = [
+            '{}{} '.format(EXPANSION_PREFIX, idx + 1),
+            listing.name,
+            listing.n_entries,
+            maybe_colorize(listing.id, sys.stdout, 'yellow'),
+            bool_to_mark(listing.uploaded),
+            listing.score if listing.score and listing.score > 0 else '-',
+        ]
+        table_rows.append(table_row)
+
+    click.echo(AsciiTable(table_rows).table)
 
     id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
     set_id_lookup(id_lookup)
