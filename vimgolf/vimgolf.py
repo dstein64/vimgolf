@@ -344,16 +344,26 @@ def get_challenge_url(challenge_id):
     return urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
 
 
+def get_stored_challenges():
+    result = {}
+    for d in os.listdir(VIMGOLF_CHALLENGES_PATH):
+        full_path = os.path.join(VIMGOLF_CHALLENGES_PATH, d)
+        if not os.path.isdir(full_path):
+            continue
+        result[d] = Challenge(d)
+    return result
+
+
 class Challenge:
     def __init__(
             self,
-            in_text,
-            out_text,
-            in_extension,
-            out_extension,
             id,
-            compliant,
-            api_key):
+            in_text=None,
+            out_text=None,
+            in_extension=None,
+            out_extension=None,
+            compliant=None,
+            api_key=None):
         self.in_text = in_text
         self.out_text = out_text
         self.in_extension = in_extension
@@ -405,6 +415,13 @@ class Challenge:
                 'timestamp': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
             })))
 
+    @property
+    def metadata(self):
+        if not os.path.exists(self.metadata_path):
+            return {}
+        with open(self.metadata_path) as f:
+            return json.load(f)
+
     def update_metadata(self, name=None, description=None):
         if not os.path.exists(self.answers_path):
             return
@@ -420,10 +437,7 @@ class Challenge:
                 if answer['correct']:
                     correct += 1
                     best_score = min(best_score, answer['score'])
-        current_metadata = {}
-        if os.path.exists(self.metadata_path):
-            with open(self.metadata_path) as f:
-                current_metadata = json.load(f)
+        current_metadata = self.metadata
         current_metadata.update({
             'id': self.id,
             'url': get_challenge_url(self.id),
@@ -635,8 +649,7 @@ def local(infile, outfile):
         in_extension=in_extension,
         out_extension=out_extension,
         id=None,
-        compliant=None,
-        api_key=None)
+    )
     with tempfile.TemporaryDirectory() as d:
         status = play(challenge, d)
     return status
@@ -710,7 +723,8 @@ def put(challenge_id):
 
 def list_(page=None, limit=LISTING_LIMIT):
     logger.info('list_(%s, %s)', page, limit)
-    Listing = namedtuple('Listing', 'id name n_entries')
+    Listing = namedtuple('Listing', 'id name n_entries is_stored uploaded correct score')
+    stored_challenges = get_stored_challenges()
     try:
         listings = []
         url = GOLF_HOST
@@ -731,7 +745,17 @@ def list_(page=None, limit=LISTING_LIMIT):
                 if child.node_type == NodeType.TEXT and 'entries' in child.data:
                     n_entries = int([x for x in child.data.split() if x.isdigit()][0])
                     break
-            listing = Listing(id=id_, name=name, n_entries=n_entries)
+            stored_challenge = stored_challenges.get(id_)
+            stored_metadata = stored_challenge.metadata if stored_challenge else {}
+            listing = Listing(
+                id=id_,
+                name=name,
+                n_entries=n_entries,
+                is_stored=bool(stored_metadata),
+                uploaded=stored_metadata.get('uploaded'),
+                correct=stored_metadata.get('correct'),
+                score=stored_metadata.get('best_score')
+            )
             listings.append(listing)
     except Exception:
         logger.exception('challenge retrieval failed')
@@ -742,7 +766,17 @@ def list_(page=None, limit=LISTING_LIMIT):
         write('{}{} '.format(EXPANSION_PREFIX, idx + 1), end=None)
         write('{} - {} entries ('.format(listing.name, listing.n_entries), end=None)
         write(listing.id, color='yellow', end=None)
-        write(')')
+        write(')', end=None if listing.is_stored else '\n')
+        if listing.is_stored:
+            true_mark = '✅'
+            false_mark = '❌'
+            bool_to_mark = lambda m: true_mark if m else false_mark
+            write(' [', end=None)
+            write(bool_to_mark(listing.uploaded), end=None)
+            write(' {}'.format(
+                listing.score if listing.score and listing.score > 0 else 'N/A'
+            ), end=None)
+            write(']')
 
     id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
     set_id_lookup(id_lookup)
@@ -817,15 +851,7 @@ def show(challenge_id):
         write(end_file, end=None)
         write(separator)
 
-        challenge = Challenge(
-            id=challenge_id,
-            in_text=None,
-            out_text=None,
-            in_extension=None,
-            out_extension=None,
-            compliant=None,
-            api_key=None
-        )
+        challenge = Challenge(challenge_id)
         challenge.update_metadata(name, description)
 
     except Exception:
