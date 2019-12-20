@@ -382,6 +382,10 @@ class Challenge:
     def answers_path(self):
         return os.path.join(self.dir, 'answers.jsonl')
 
+    @property
+    def metadata_path(self):
+        return os.path.join(self.dir, 'metadata.json')
+
     def save(self, spec):
         os.makedirs(self.dir, exist_ok=True)
         with open(self.in_path, 'w') as f:
@@ -400,6 +404,28 @@ class Challenge:
                 'uploaded': uploaded,
                 'timestamp': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
             })))
+
+    def update_metadata(self):
+        if not os.path.exists(self.answers_path):
+            return
+        uploaded = 0
+        correct = 0
+        stub_score = 10 ** 10
+        best_score = stub_score
+        with open(self.answers_path) as f:
+            for raw_answer in f:
+                answer = json.loads(raw_answer)
+                if answer['uploaded']:
+                    uploaded += 1
+                if answer['correct']:
+                    correct += 1
+                    best_score = min(best_score, answer['score'])
+        with open(self.metadata_path, 'w') as f:
+            json.dump({
+                'uploaded': uploaded,
+                'correct': correct,
+                'best_score': best_score if best_score != stub_score else -1
+            }, f)
 
 
 def upload_result(challenge_id, api_key, raw_keys):
@@ -666,6 +692,7 @@ def put(challenge_id):
     challenge.save(spec=challenge_spec)
     with tempfile.TemporaryDirectory() as d:
         status = play(challenge, d)
+    challenge.update_metadata()
 
     return status
 
