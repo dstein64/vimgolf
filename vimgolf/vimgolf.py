@@ -408,7 +408,7 @@ class Challenge:
         return os.path.join(self.dir, 'metadata.json')
 
     def save(self, spec):
-        os.makedirs(self.dir, exist_ok=True)
+        self._ensure_dir()
         with open(self.in_path, 'w') as f:
             f.write(self.in_text)
         with open(self.out_path, 'w') as f:
@@ -417,6 +417,7 @@ class Challenge:
             json.dump(spec, f)
 
     def add_answer(self, keys, correct, score, uploaded):
+        self._ensure_dir()
         with open(self.answers_path, 'a') as f:
             f.write('{}\n'.format(json.dumps({
                 'keys': keys,
@@ -444,6 +445,7 @@ class Challenge:
             return json.load(f)
 
     def update_metadata(self, name=None, description=None):
+        self._ensure_dir()
         uploaded = 0
         correct = 0
         stub_score = 10 ** 10
@@ -468,6 +470,10 @@ class Challenge:
             current_metadata['description'] = description
         with open(self.metadata_path, 'w') as f:
             json.dump(current_metadata, f)
+
+    def _ensure_dir(self):
+        if not os.path.exists(self.dir):
+            os.makedirs(self.dir, exist_ok=True)
 
 
 def upload_result(challenge_id, api_key, raw_keys):
@@ -876,13 +882,11 @@ def show(challenge_id, tracked=False):
             write('Correct Solutions: {}'.format(metadata['correct']))
             write('Self Best Score: {}'.format(metadata['best_score']))
             answers = challenge.answers
-            ignored_answers = {
-                'ZQ'
-            }
+            ignored_answer_suffix = 'ZQ'
             answer_rows = [['Keys', 'Correct', 'Submitted', 'Score', 'Timestamp']]
             for answer in answers:
                 keys = ''.join(answer['keys'])
-                if keys in ignored_answers:
+                if keys.endswith(ignored_answer_suffix):
                     continue
                 answer_row = [
                     keys,
