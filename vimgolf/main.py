@@ -83,8 +83,8 @@ def config(api_key):
     commands.config(api_key or None)
 
 
-@command('version')
-def version_cmd():
+@command()
+def version():
     """display the version number"""
     write(__version__)
 
