@@ -2,7 +2,8 @@ import os
 import tempfile
 
 from vimgolf import logger
-from vimgolf.core import Challenge, play
+from vimgolf.core import Challenge
+from vimgolf.play import play
 from vimgolf.utils import format_
 
 

@@ -19,8 +19,8 @@ from vimgolf.core import (
     validate_api_key,
     show_api_key_help,
     Challenge,
-    play,
 )
+from vimgolf.play import play
 from vimgolf.utils import write, confirm, http_request, format_
 
 
