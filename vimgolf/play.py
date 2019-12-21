@@ -190,4 +190,3 @@ def upload_result(challenge_id, api_key, raw_keys):
     except Exception:
         logger.exception('upload failed')
     return status
-

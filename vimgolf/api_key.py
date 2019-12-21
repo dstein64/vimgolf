@@ -31,4 +31,3 @@ def show_api_key_help():
 def show_api_key_error():
     write('Invalid API key', stream=sys.stderr, color='red')
     write('Please check your API key on vimgolf.com', stream=sys.stderr, color='red')
-
