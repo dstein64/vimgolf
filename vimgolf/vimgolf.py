@@ -3,6 +3,7 @@ import concurrent.futures
 import datetime
 from enum import Enum
 import filecmp
+import functools
 import glob
 import json
 import logging.handlers
@@ -807,7 +808,7 @@ def list_(page=None, limit=LISTING_LIMIT):
         ]
         table_rows.append(table_row)
 
-    click.echo(AsciiTable(table_rows).table)
+    write(AsciiTable(table_rows).table)
 
     id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
     set_id_lookup(id_lookup)
@@ -946,9 +947,13 @@ def main():
     pass
 
 
-def exit_status(status):
-    exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
-    sys.exit(exit_code)
+def exit_status(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        status = fn(*args, **kwargs)
+        exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
+        sys.exit(exit_code)
+    return wrapper
 
 
 argument = click.argument
@@ -959,20 +964,23 @@ command = main.command
 @command('local')
 @argument('in_file')
 @argument('out_file')
+@exit_status
 def local_cmd(in_file, out_file):
     """launch local challenge """
-    exit_status(local(in_file, out_file))
+    return local(in_file, out_file)
 
 
 @command('put')
 @argument('challenge_id')
+@exit_status
 def put_cmd(challenge_id):
     """launch vimgolf.com challenge"""
-    exit_status(put(challenge_id))
+    return put(challenge_id)
 
 
 @command('list')
 @argument('spec', default='')
+@exit_status
 def list_cmd(spec):
     """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT])"""
     page_and_limit = spec
@@ -985,28 +993,30 @@ def list_cmd(spec):
             kwargs['limit'] = int(parts[1])
     except Exception:
         pass
-    exit_status(list_(**kwargs))
+    return list_(**kwargs)
 
 
 @command('show')
 @argument('challenge_id')
 @option('-t', '--tracked', is_flag=True, help='Include tracked data')
+@exit_status
 def show_cmd(challenge_id, tracked):
     """show vimgolf.com challenge"""
-    exit_status(show(challenge_id, tracked))
+    return show(challenge_id, tracked)
 
 
 @command('config')
 @argument('api_key', default='')
+@exit_status
 def config_cmd(api_key):
     """configure your vimgolf.com credentials"""
-    exit_status(config(api_key or None))
+    return config(api_key or None)
 
 
 @command('version')
 def version_cmd():
     """display the version number"""
-    click.echo(__version__)
+    write(__version__)
 
 
 if __name__ == '__main__':
