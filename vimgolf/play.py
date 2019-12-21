@@ -30,39 +30,21 @@ def play(challenge, workspace):
 
 
 def main_loop(challenge, infile, logfile, outfile):
-    vimrc = PLAY_VIMRC_PATH
-    play_args = [
-        '-Z',  # restricted mode, utilities not allowed
-        '-n',  # no swap file, memory only editing
-        '--noplugin',  # no plugins
-        '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-        '+0',  # start on line 0
-        '-u', vimrc,  # vimgolf .vimrc
-        '-U', 'NONE',  # don't load .gvimrc
-        '-W', logfile,  # keylog file (overwrites existing)
-        infile,
-    ]
 
     while True:
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        vim(play_args, check=True)
+        play_result = play_single(
+            infile=infile,
+            logfile=logfile,
+            outfile=outfile,
+        )
 
-        correct = filecmp.cmp(infile, outfile)
-
-        with open(logfile, 'rb') as _f:
-            # raw keypress representation saved by vim's -w
-            raw_keys = _f.read()
-
-        # list of parsed keycode byte strings
-        keycodes = parse_keycodes(raw_keys)
-        keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
-
-        # list of human-readable key strings
-        keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
-
-        score = len(keycodes)
+        raw_keys = play_result['raw_keys']
+        keycode_reprs = play_result['keycode_reprs']
+        correct = play_result['correct']
+        score = play_result['score']
 
         write('Here are your keystrokes:', color='green')
         for keycode_repr in keycode_reprs:
@@ -78,7 +60,7 @@ def main_loop(challenge, infile, logfile, outfile):
             write('Your score for this failed attempt:', color='red')
         write(score)
 
-        should_break, uploaded = menu_loop(
+        menu_loop_result = menu_loop(
             challenge=challenge,
             correct=correct,
             infile=infile,
@@ -91,11 +73,43 @@ def main_loop(challenge, infile, logfile, outfile):
                 keys=keycode_reprs,
                 score=score,
                 correct=correct,
-                uploaded=uploaded,
+                uploaded=menu_loop_result['uploaded'],
             )
 
-        if should_break:
+        if menu_loop_result['should_quit']:
             break
+
+
+def play_single(infile, logfile, outfile):
+    vimrc = PLAY_VIMRC_PATH
+    play_args = [
+        '-Z',  # restricted mode, utilities not allowed
+        '-n',  # no swap file, memory only editing
+        '--noplugin',  # no plugins
+        '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
+        '+0',  # start on line 0
+        '-u', vimrc,  # vimgolf .vimrc
+        '-U', 'NONE',  # don't load .gvimrc
+        '-W', logfile,  # keylog file (overwrites existing)
+        infile,
+    ]
+    vim(play_args, check=True)
+    correct = filecmp.cmp(infile, outfile)
+    with open(logfile, 'rb') as _f:
+        # raw keypress representation saved by vim's -w
+        raw_keys = _f.read()
+    # list of parsed keycode byte strings
+    keycodes = parse_keycodes(raw_keys)
+    keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
+    # list of human-readable key strings
+    keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
+    score = len(keycodes)
+    return {
+        'correct': correct,
+        'keycode_reprs': keycode_reprs,
+        'raw_keys': raw_keys,
+        'score': score,
+    }
 
 
 def menu_loop(
@@ -142,7 +156,10 @@ def menu_loop(
     should_quit = selection == 'q'
     if not should_quit:
         write('Retrying vimgolf challenge', color='yellow')
-    return should_quit, uploaded
+    return {
+        'should_quit': should_quit,
+        'uploaded': uploaded,
+    }
 
 
 def upload_result(challenge_id, api_key, raw_keys):
