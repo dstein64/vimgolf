@@ -96,20 +96,17 @@ LOG_LIMIT = 10
 # As of 2018, most browsers use a max of six connections per hostname.
 MAX_REQUEST_WORKERS = 6
 
-VIMRC_PATH = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+PLAY_VIMRC_PATH = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
 
 CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
 VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
-VIMGOLF_API_KEY_FILENAME = 'api_key'
-VIMGOLF_API_KEY_PATH = os.path.join(VIMGOLF_CONFIG_PATH, VIMGOLF_API_KEY_FILENAME)
+VIMGOLF_API_KEY_PATH = os.path.join(VIMGOLF_CONFIG_PATH, 'api_key')
 
 DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(USER_HOME, '.local', 'share'))
 VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
 os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
-
-VIMGOLF_ID_LOOKUP_FILENAME = 'id_lookup.json'
-VIMGOLF_ID_LOOKUP_PATH = os.path.join(VIMGOLF_DATA_PATH, VIMGOLF_ID_LOOKUP_FILENAME)
+VIMGOLF_ID_LOOKUP_PATH = os.path.join(VIMGOLF_DATA_PATH, 'id_lookup.json')
 
 VIMGOLF_CHALLENGES_PATH = os.path.join(VIMGOLF_DATA_PATH, 'challenges')
 os.makedirs(VIMGOLF_CHALLENGES_PATH, exist_ok=True)
@@ -438,6 +435,13 @@ class Challenge:
         return sorted(result, key=lambda a: a['timestamp'])
 
     @property
+    def spec(self):
+        if not os.path.exists(self.spec_path):
+            return {}
+        with open(self.spec_path) as f:
+            return json.load(f)
+
+    @property
     def metadata(self):
         if not os.path.exists(self.metadata_path):
             return {}
@@ -558,7 +562,7 @@ def play(challenge, workspace):
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        vimrc = VIMRC_PATH
+        vimrc = PLAY_VIMRC_PATH
         play_args = [
             '-Z',           # restricted mode, utilities not allowed
             '-n',           # no swap file, memory only editing
@@ -619,8 +623,8 @@ def play(challenge, workspace):
             menu.append(('r', 'Retry the current challenge'))
             menu.append(('q', 'Quit vimgolf'))
             valid_codes = [x[0] for x in menu]
-            for option in menu:
-                write('[{}] {}'.format(*option), color='yellow')
+            for opt in menu:
+                write('[{}] {}'.format(*opt), color='yellow')
             selection = input_loop('Choice> ')
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
@@ -693,10 +697,16 @@ def put(challenge_id):
             return Status.FAILURE
 
     try:
-        write('Downloading vimgolf challenge {}'.format(challenge_id), color='yellow')
-        url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
-        response = http_request(url)
-        challenge_spec = json.loads(response.body)
+        cached_challenge = Challenge(challenge_id)
+        cached_spec = cached_challenge.spec
+        if cached_spec:
+            write('Using locally cached challenge {}'.format(challenge_id), color='yellow')
+            challenge_spec = cached_spec
+        else:
+            write('Downloading vimgolf challenge {}'.format(challenge_id), color='yellow')
+            url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
+            response = http_request(url)
+            challenge_spec = json.loads(response.body)
         compliant = challenge_spec.get('client') == RUBY_CLIENT_VERSION_COMPLIANCE
         if not compliant:
             message = 'vimgolf=={} is not compliant with vimgolf.com'.format(__version__)
