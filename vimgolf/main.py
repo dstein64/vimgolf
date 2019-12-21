@@ -3,9 +3,10 @@ import sys
 
 import click
 
+
 from vimgolf import Status, EXIT_SUCCESS, EXIT_FAILURE, __version__
 from vimgolf.utils import write
-from vimgolf.core import config, show, list_, put, local
+from vimgolf.commands import config, show, list_, put, local
 
 
 @click.group()
@@ -87,4 +88,3 @@ def version_cmd():
 
 if __name__ == '__main__':
     main()
-
