@@ -30,7 +30,6 @@ def play(challenge, workspace):
 
 
 def main_loop(challenge, infile, logfile, outfile):
-
     while True:
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
