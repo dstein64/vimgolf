@@ -3,7 +3,6 @@ import sys
 
 import click
 
-
 from vimgolf import commands
 from vimgolf import Status, EXIT_SUCCESS, EXIT_FAILURE, __version__
 from vimgolf.utils import write
