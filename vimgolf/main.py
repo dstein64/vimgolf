@@ -16,25 +16,25 @@ def main():
     pass
 
 
-def exit_status(fn):
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            fn(*args, **kwargs)
-        except Failure:
-            sys.exit(1)
-    return wrapper
-
-
 argument = click.argument
 option = click.option
-command = main.command
+
+
+def command(*cmd_args, **cmd_kwargs):
+    def result(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            try:
+                fn(*args, **kwargs)
+            except Failure:
+                sys.exit(1)
+        return main.command(*cmd_args, **cmd_kwargs)(wrapper)
+    return result
 
 
 @command()
 @argument('in_file')
 @argument('out_file')
-@exit_status
 def local(in_file, out_file):
     """launch local challenge """
     commands.local(in_file, out_file)
@@ -42,7 +42,6 @@ def local(in_file, out_file):
 
 @command()
 @argument('challenge_id')
-@exit_status
 def put(challenge_id):
     """launch vimgolf.com challenge"""
     commands.put(challenge_id)
@@ -50,7 +49,6 @@ def put(challenge_id):
 
 @command('list')
 @argument('spec', default='')
-@exit_status
 def list_(spec):
     """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT])"""
     page_and_limit = spec
@@ -69,7 +67,6 @@ def list_(spec):
 @command()
 @argument('challenge_id')
 @option('-t', '--tracked', is_flag=True, help='Include tracked data')
-@exit_status
 def show(challenge_id, tracked):
     """show vimgolf.com challenge"""
     commands.show(challenge_id, tracked)
@@ -77,7 +74,6 @@ def show(challenge_id, tracked):
 
 @command()
 @argument('api_key', default='')
-@exit_status
 def config(api_key):
     """configure your vimgolf.com credentials"""
     commands.config(api_key or None)
