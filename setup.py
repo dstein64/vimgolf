@@ -28,7 +28,7 @@ setup(
         'terminaltables>=3,<4'
     ],
     entry_points={
-        'console_scripts': ['vimgolf=vimgolf.vimgolf:main'],
+        'console_scripts': ['vimgolf=vimgolf.main:main'],
     },
     keywords=['vim', 'vimgolf'],
     license='MIT',

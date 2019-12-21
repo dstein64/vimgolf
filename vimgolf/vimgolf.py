@@ -1,14 +1,9 @@
 from collections import namedtuple
 import concurrent.futures
 import datetime
-from enum import Enum
 import filecmp
-import functools
-import glob
 import json
-import logging.handlers
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
@@ -16,9 +11,24 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-import click
 from terminaltables import AsciiTable
 
+from vimgolf import (
+    VIMGOLF_API_KEY_PATH,
+    VIMGOLF_ID_LOOKUP_PATH,
+    EXPANSION_PREFIX,
+    GOLF_HOST,
+    VIMGOLF_CHALLENGES_PATH,
+    logger,
+    GOLF_VIM,
+    PLAY_VIMRC_PATH,
+    RUBY_CLIENT_VERSION_COMPLIANCE,
+    __version__,
+    LISTING_LIMIT,
+    MAX_REQUEST_WORKERS,
+    LEADER_LIMIT,
+    Status
+)
 from vimgolf.html import (
     get_elements_by_classname,
     get_element_by_id,
@@ -32,267 +42,18 @@ from vimgolf.keys import (
     IGNORED_KEYSTROKES,
     parse_keycodes,
 )
+from vimgolf.utils import (
+    write,
+    http_request,
+    find_executable,
+    confirm,
+    input_loop,
+    format_,
+    maybe_colorize,
+    bool_to_mark,
+    join_lines
+)
 
-version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
-with open(version_txt, 'r') as vf:
-    __version__ = vf.read().strip()
-
-
-class Status(Enum):
-    SUCCESS = 1
-    FAILURE = 2
-
-
-EXIT_SUCCESS = 0
-EXIT_FAILURE = 1
-
-
-# ************************************************************
-# * Environment
-# ************************************************************
-
-# Enable ANSI terminal colors on Windows
-if sys.platform == 'win32':
-    import ctypes
-    from ctypes import wintypes
-    kernel32 = ctypes.windll.kernel32
-    STD_OUTPUT_HANDLE = -11                   # https://docs.microsoft.com/en-us/windows/console/getstdhandle
-    STD_ERROR_HANDLE = -12                    # ditto
-    ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x4  # https://docs.microsoft.com/en-us/windows/console/getconsolemode
-    for std_device in [STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]:
-        handle = kernel32.GetStdHandle(wintypes.DWORD(std_device))
-        old_console_mode = wintypes.DWORD()
-        kernel32.GetConsoleMode(handle, ctypes.byref(old_console_mode))
-        new_console_mode = wintypes.DWORD(ENABLE_VIRTUAL_TERMINAL_PROCESSING | old_console_mode.value)
-        kernel32.SetConsoleMode(handle, new_console_mode)
-
-
-# ************************************************************
-# * Configuration, Global Variables, and Logging
-# ************************************************************
-
-GOLF_HOST = os.environ.get('GOLF_HOST', 'https://www.vimgolf.com')
-GOLF_VIM = os.environ.get('GOLF_VIM', 'vim')
-
-USER_AGENT = 'vimgolf'
-
-RUBY_CLIENT_VERSION_COMPLIANCE = '0.4.8'
-
-EXPANSION_PREFIX = '+'
-
-USER_HOME = os.path.expanduser('~')
-
-TIMESTAMP = datetime.datetime.utcnow().timestamp()
-
-# Max number of listings by default for 'vimgolf list'
-LISTING_LIMIT = 10
-
-# Max number of leaders to show for 'vimgolf show'
-LEADER_LIMIT = 3
-
-# Max number of existing logs to retain
-LOG_LIMIT = 10
-
-# Max number of parallel web requests.
-# As of 2018, most browsers use a max of six connections per hostname.
-MAX_REQUEST_WORKERS = 6
-
-PLAY_VIMRC_PATH = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-
-CONFIG_HOME = os.environ.get('XDG_CONFIG_HOME', os.path.join(USER_HOME, '.config'))
-VIMGOLF_CONFIG_PATH = os.path.join(CONFIG_HOME, 'vimgolf')
-os.makedirs(VIMGOLF_CONFIG_PATH, exist_ok=True)
-VIMGOLF_API_KEY_PATH = os.path.join(VIMGOLF_CONFIG_PATH, 'api_key')
-
-DATA_HOME = os.environ.get('XDG_DATA_HOME', os.path.join(USER_HOME, '.local', 'share'))
-VIMGOLF_DATA_PATH = os.path.join(DATA_HOME, 'vimgolf')
-os.makedirs(VIMGOLF_DATA_PATH, exist_ok=True)
-VIMGOLF_ID_LOOKUP_PATH = os.path.join(VIMGOLF_DATA_PATH, 'id_lookup.json')
-
-VIMGOLF_CHALLENGES_PATH = os.path.join(VIMGOLF_DATA_PATH, 'challenges')
-os.makedirs(VIMGOLF_CHALLENGES_PATH, exist_ok=True)
-
-CACHE_HOME = os.environ.get('XDG_CACHE_HOME', os.path.join(USER_HOME, '.cache'))
-VIMGOLF_CACHE_PATH = os.path.join(CACHE_HOME, 'vimgolf')
-os.makedirs(VIMGOLF_CACHE_PATH, exist_ok=True)
-
-VIMGOLF_LOG_DIR_PATH = os.path.join(VIMGOLF_CACHE_PATH, 'log')
-os.makedirs(VIMGOLF_LOG_DIR_PATH, exist_ok=True)
-VIMGOLF_LOG_FILENAME = 'vimgolf-{}-{}.log'.format(TIMESTAMP, os.getpid())
-VIMGOLF_LOG_PATH = os.path.join(VIMGOLF_LOG_DIR_PATH, VIMGOLF_LOG_FILENAME)
-
-logger = logging.getLogger('vimgolf')
-
-# Initialize logger
-logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(VIMGOLF_LOG_PATH, mode='w')
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.info('vimgolf started')
-
-# Clean stale logs
-logger.info('cleaning stale logs')
-existing_logs_glob = os.path.join(VIMGOLF_LOG_DIR_PATH, 'vimgolf-*-*.log')
-existing_logs = glob.glob(existing_logs_glob)
-log_sort_key = lambda x: float(os.path.basename(x).split('-')[1])
-stale_existing_logs = sorted(existing_logs, key=log_sort_key)[:-LOG_LIMIT]
-for log in stale_existing_logs:
-    logger.info('deleting stale log: {}'.format(log))
-    try:
-        os.remove(log)
-    except Exception:
-        logger.exception('error deleting stale log: {}'.format(log))
-
-
-# ************************************************************
-# * Utils
-# ************************************************************
-
-HttpResponse = namedtuple('HttpResponse', 'code msg headers body')
-
-
-def http_request(url, data=None):
-    request = urllib.request.Request(url, data, headers={'User-Agent': USER_AGENT})
-    response = urllib.request.urlopen(request)
-    try:
-        charset = response.getheader('Content-Type').split(';')[1].split('=')[1].strip()
-    except Exception:
-        charset = 'utf-8'
-    body = response.read().decode(charset)
-    return HttpResponse(
-        code=response.code,
-        msg=response.msg,
-        headers=response.getheaders(),
-        body=body
-    )
-
-
-def join_lines(string):
-    lines = [line.strip() for line in string.split('\n') if line]
-    return ' '.join(lines)
-
-
-def maybe_colorize(string, stream, color=None):
-    color_lookup = {
-        'red':     '\033[31m',
-        'green':   '\033[32m',
-        'yellow':  '\033[33m',
-        'blue':    '\033[34m',
-        'magenta': '\033[35m',
-        'cyan':    '\033[36m',
-    }
-    end_color = '\033[0m'
-    if color and color not in color_lookup:
-        raise RuntimeError('Unavailable color: {}'.format(color))
-    if color and hasattr(stream, 'isatty') and stream.isatty():
-        string = color_lookup[color] + string + end_color
-    return string
-
-
-def write(string, end='\n', stream=None, color=None):
-    string = str(string)
-    if stream is None:
-        stream = sys.stdout
-    string = maybe_colorize(string, stream, color)
-    stream.write(string)
-    if end is not None:
-        stream.write(str(end))
-    stream.flush()
-
-
-def format_(string):
-    """dos2unix and add newline to end if missing."""
-    string = string.replace('\r\n', '\n').replace('\r', '\n')
-    if not string.endswith('\n'):
-        string = string + '\n'
-    return string
-
-
-def input_loop(prompt, strip=True, required=True):
-    try:
-        import readline
-    except Exception:
-        pass
-    while True:
-        try:
-            selection = input(prompt)
-            if strip:
-                selection = selection.strip()
-            if required and not selection:
-                continue
-            return selection
-        except EOFError:
-            write('', stream=sys.stderr)
-            sys.exit(EXIT_FAILURE)
-        except KeyboardInterrupt:
-            write('', stream=sys.stderr)
-            write('KeyboardInterrupt', stream=sys.stderr)
-            continue
-
-
-def confirm(prompt):
-    while True:
-        selection = input_loop('{} [y/n] '.format(prompt)).lower()
-        if selection in ('y', 'yes'):
-            break
-        elif selection in ('n', 'no'):
-            return False
-        else:
-            write('Invalid selection: {}'.format(selection), stream=sys.stdout, color='red')
-    return True
-
-
-def find_executable_unix(executable):
-    if os.path.isfile(executable):
-        return executable
-    paths = os.environ.get('PATH', os.defpath).split(os.pathsep)
-    for p in paths:
-        f = os.path.join(p, executable)
-        if os.path.isfile(f):
-            return f
-    return None
-
-
-def find_executable_win32(executable):
-    """Emulates how cmd.exe seemingly searches for executables."""
-    def fixcase(path):
-        return str(Path(path).resolve())
-    pathext = os.environ.get('PATHEXT', '.EXE')
-    pathexts = list(x.upper() for x in pathext.split(os.pathsep))
-    _, ext = os.path.splitext(executable)
-    if os.path.isfile(executable) and ext.upper() in pathexts:
-        return fixcase(executable)
-    for x in pathexts:
-        if os.path.isfile(executable + x):
-            return fixcase(executable + x)
-    if executable != os.path.basename(executable):
-        return None
-    paths = os.environ.get('PATH', os.defpath).split(os.pathsep)
-    for p in paths:
-        candidate = os.path.join(p, executable)
-        if os.path.isfile(candidate) and ext.upper() in pathexts:
-            return fixcase(candidate)
-        for x in pathexts:
-            if os.path.isfile(candidate + x):
-                return fixcase(candidate + x)
-    return None
-
-
-def find_executable(executable):
-    if sys.platform == 'win32':
-        return find_executable_win32(executable)
-    else:
-        return find_executable_unix(executable)
-
-
-bool_to_mark = lambda m: '✅' if m else '❌'
-
-
-# ************************************************************
-# * Core
-# ************************************************************
 
 def validate_challenge_id(challenge_id):
     return challenge_id is not None and re.match(r'[\w\d]{24}', challenge_id)
@@ -936,89 +697,3 @@ def config(api_key=None):
         show_api_key_help()
 
     return Status.SUCCESS
-
-
-# ************************************************************
-# * Command Line Interface
-# ************************************************************
-
-@click.group()
-def main():
-    pass
-
-
-def exit_status(fn):
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        status = fn(*args, **kwargs)
-        exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
-        sys.exit(exit_code)
-    return wrapper
-
-
-argument = click.argument
-option = click.option
-command = main.command
-
-
-@command('local')
-@argument('in_file')
-@argument('out_file')
-@exit_status
-def local_cmd(in_file, out_file):
-    """launch local challenge """
-    return local(in_file, out_file)
-
-
-@command('put')
-@argument('challenge_id')
-@exit_status
-def put_cmd(challenge_id):
-    """launch vimgolf.com challenge"""
-    return put(challenge_id)
-
-
-@command('list')
-@argument('spec', default='')
-@exit_status
-def list_cmd(spec):
-    """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT])"""
-    page_and_limit = spec
-    kwargs = {}
-    parts = page_and_limit.split(':')
-    try:
-        if len(parts) > 0 and parts[0]:
-            kwargs['page'] = int(parts[0])
-        if len(parts) > 1:
-            kwargs['limit'] = int(parts[1])
-    except Exception:
-        pass
-    return list_(**kwargs)
-
-
-@command('show')
-@argument('challenge_id')
-@option('-t', '--tracked', is_flag=True, help='Include tracked data')
-@exit_status
-def show_cmd(challenge_id, tracked):
-    """show vimgolf.com challenge"""
-    return show(challenge_id, tracked)
-
-
-@command('config')
-@argument('api_key', default='')
-@exit_status
-def config_cmd(api_key):
-    """configure your vimgolf.com credentials"""
-    return config(api_key or None)
-
-
-@command('version')
-def version_cmd():
-    """display the version number"""
-    write(__version__)
-
-
-if __name__ == '__main__':
-    main()
-
