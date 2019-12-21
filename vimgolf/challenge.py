@@ -4,21 +4,14 @@ import os
 import re
 import sys
 import urllib.parse
-import urllib.request
 
 from vimgolf import (
-    logger,
-    Status,
-    VIMGOLF_API_KEY_PATH,
     VIMGOLF_ID_LOOKUP_PATH,
     EXPANSION_PREFIX,
     GOLF_HOST,
     VIMGOLF_CHALLENGES_PATH,
 )
-from vimgolf.utils import (
-    write,
-    http_request,
-)
+from vimgolf.utils import write
 
 
 def validate_challenge_id(challenge_id):
@@ -28,33 +21,6 @@ def validate_challenge_id(challenge_id):
 def show_challenge_id_error():
     write('Invalid challenge ID', stream=sys.stderr, color='red')
     write('Please check the ID on vimgolf.com', stream=sys.stderr, color='red')
-
-
-def validate_api_key(api_key):
-    return api_key is not None and re.match(r'[\w\d]{32}', api_key)
-
-
-def get_api_key():
-    if not os.path.exists(VIMGOLF_API_KEY_PATH):
-        return None
-    with open(VIMGOLF_API_KEY_PATH, 'r') as f:
-        api_key = f.read()
-        return api_key
-
-
-def set_api_key(api_key):
-    with open(VIMGOLF_API_KEY_PATH, 'w') as f:
-        f.write(api_key)
-
-
-def show_api_key_help():
-    write('An API key can be obtained from vimgolf.com', color='yellow')
-    write('Please run "vimgolf config API_KEY" to set your API key', color='yellow')
-
-
-def show_api_key_error():
-    write('Invalid API key', stream=sys.stderr, color='red')
-    write('Please check your API key on vimgolf.com', stream=sys.stderr, color='red')
 
 
 def get_id_lookup():
@@ -206,23 +172,3 @@ class Challenge:
     def _ensure_dir(self):
         if not os.path.exists(self.dir):
             os.makedirs(self.dir, exist_ok=True)
-
-
-def upload_result(challenge_id, api_key, raw_keys):
-    logger.info('upload_result(...)')
-    status = Status.FAILURE
-    try:
-        url = urllib.parse.urljoin(GOLF_HOST, '/entry.json')
-        data_dict = {
-            'challenge_id': challenge_id,
-            'apikey':       api_key,
-            'entry':        raw_keys,
-        }
-        data = urllib.parse.urlencode(data_dict).encode()
-        response = http_request(url, data=data)
-        message = json.loads(response.body)
-        if message.get('status') == 'ok':
-            status = Status.SUCCESS
-    except Exception:
-        logger.exception('upload failed')
-    return status

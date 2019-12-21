@@ -13,7 +13,7 @@ from vimgolf import (
     MAX_REQUEST_WORKERS,
     LEADER_LIMIT,
 )
-from vimgolf.core import (
+from vimgolf.challenge import (
     expand_challenge_id,
     validate_challenge_id,
     show_challenge_id_error,

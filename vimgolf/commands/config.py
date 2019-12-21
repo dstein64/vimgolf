@@ -1,5 +1,5 @@
 from vimgolf import logger, Status
-from vimgolf.core import (
+from vimgolf.api_key import (
     validate_api_key,
     show_api_key_error,
     set_api_key,

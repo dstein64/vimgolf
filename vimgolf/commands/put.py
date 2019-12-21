@@ -11,13 +11,11 @@ from vimgolf import (
     GOLF_HOST,
     RUBY_CLIENT_VERSION_COMPLIANCE,
 )
-from vimgolf.core import (
+from vimgolf.api_key import get_api_key, validate_api_key, show_api_key_help
+from vimgolf.challenge import (
     expand_challenge_id,
     validate_challenge_id,
     show_challenge_id_error,
-    get_api_key,
-    validate_api_key,
-    show_api_key_help,
     Challenge,
 )
 from vimgolf.play import play

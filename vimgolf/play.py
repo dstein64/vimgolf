@@ -1,11 +1,13 @@
 import filecmp
+import json
 import os
 import sys
+import urllib.parse
 
-from vimgolf import logger, GOLF_VIM, Status, PLAY_VIMRC_PATH
-from vimgolf.core import upload_result, get_challenge_url
+from vimgolf import logger, GOLF_VIM, Status, PLAY_VIMRC_PATH, GOLF_HOST
+from vimgolf.challenge import get_challenge_url
 from vimgolf.keys import parse_keycodes, IGNORED_KEYSTROKES, get_keycode_repr
-from vimgolf.utils import find_executable, write, confirm, input_loop
+from vimgolf.utils import find_executable, write, confirm, input_loop, http_request
 
 
 def play(challenge, workspace):
@@ -168,3 +170,24 @@ def play(challenge, workspace):
 
     write('Thanks for playing!', color='green')
     return Status.SUCCESS
+
+
+def upload_result(challenge_id, api_key, raw_keys):
+    logger.info('upload_result(...)')
+    status = Status.FAILURE
+    try:
+        url = urllib.parse.urljoin(GOLF_HOST, '/entry.json')
+        data_dict = {
+            'challenge_id': challenge_id,
+            'apikey':       api_key,
+            'entry':        raw_keys,
+        }
+        data = urllib.parse.urlencode(data_dict).encode()
+        response = http_request(url, data=data)
+        message = json.loads(response.body)
+        if message.get('status') == 'ok':
+            status = Status.SUCCESS
+    except Exception:
+        logger.exception('upload failed')
+    return status
+

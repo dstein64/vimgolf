@@ -11,7 +11,7 @@ from vimgolf import (
     Status,
     EXPANSION_PREFIX,
 )
-from vimgolf.core import get_stored_challenges, set_id_lookup
+from vimgolf.challenge import get_stored_challenges, set_id_lookup
 from vimgolf.html import (
     parse_html,
     get_elements_by_classname,
