@@ -4,9 +4,9 @@ import sys
 import click
 
 
+from vimgolf import commands
 from vimgolf import Status, EXIT_SUCCESS, EXIT_FAILURE, __version__
 from vimgolf.utils import write
-from vimgolf.commands import config, show, list_, put, local
 
 
 @click.group()
@@ -28,27 +28,27 @@ option = click.option
 command = main.command
 
 
-@command('local')
+@command()
 @argument('in_file')
 @argument('out_file')
 @exit_status
-def local_cmd(in_file, out_file):
+def local(in_file, out_file):
     """launch local challenge """
-    return local(in_file, out_file)
+    return commands.local(in_file, out_file)
 
 
-@command('put')
+@command()
 @argument('challenge_id')
 @exit_status
-def put_cmd(challenge_id):
+def put(challenge_id):
     """launch vimgolf.com challenge"""
-    return put(challenge_id)
+    return commands.put(challenge_id)
 
 
 @command('list')
 @argument('spec', default='')
 @exit_status
-def list_cmd(spec):
+def list_(spec):
     """list vimgolf.com challenges (spec syntax: [PAGE][:LIMIT])"""
     page_and_limit = spec
     kwargs = {}
@@ -60,24 +60,24 @@ def list_cmd(spec):
             kwargs['limit'] = int(parts[1])
     except Exception:
         pass
-    return list_(**kwargs)
+    return commands.list_(**kwargs)
 
 
-@command('show')
+@command()
 @argument('challenge_id')
 @option('-t', '--tracked', is_flag=True, help='Include tracked data')
 @exit_status
-def show_cmd(challenge_id, tracked):
+def show(challenge_id, tracked):
     """show vimgolf.com challenge"""
-    return show(challenge_id, tracked)
+    return commands.show(challenge_id, tracked)
 
 
-@command('config')
+@command()
 @argument('api_key', default='')
 @exit_status
-def config_cmd(api_key):
+def config(api_key):
     """configure your vimgolf.com credentials"""
-    return config(api_key or None)
+    return commands.config(api_key or None)
 
 
 @command('version')
