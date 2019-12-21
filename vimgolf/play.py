@@ -6,7 +6,7 @@ import urllib.parse
 
 from vimgolf import logger, PLAY_VIMRC_PATH, GOLF_HOST
 from vimgolf.challenge import get_challenge_url
-from vimgolf.keys import parse_keycodes, IGNORED_KEYSTROKES, get_keycode_repr
+from vimgolf.keys import Keys
 from vimgolf.utils import write, input_loop, http_request
 from vimgolf.vim import vim
 
@@ -95,19 +95,12 @@ def play_single(infile, logfile, outfile):
     vim(play_args, check=True)
     correct = filecmp.cmp(infile, outfile)
     with open(logfile, 'rb') as _f:
-        # raw keypress representation saved by vim's -w
-        raw_keys = _f.read()
-    # list of parsed keycode byte strings
-    keycodes = parse_keycodes(raw_keys)
-    keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
-    # list of human-readable key strings
-    keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
-    score = len(keycodes)
+        keys = Keys.from_raw_keys(_f.read())
     return {
         'correct': correct,
-        'keycode_reprs': keycode_reprs,
-        'raw_keys': raw_keys,
-        'score': score,
+        'keycode_reprs': keys.keycode_reprs,
+        'raw_keys': keys.raw_keys,
+        'score': keys.score,
     }
 
 

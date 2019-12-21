@@ -34,6 +34,16 @@ def parse_keycodes(raw_keys):
     return keycodes
 
 
+def to_raw_keys(keycodes):
+    raw_keys = []
+    for keycode in keycodes:
+        if keycode[0] == 0:
+            raw_keys.append(keycode[1])
+        else:
+            raw_keys.extend([0x80, keycode[0], keycode[1]])
+    return bytes(raw_keys)
+
+
 # keystrokes that should not impact score (e.g., window focus)
 IGNORED_KEYSTROKES = {
     b'\xfd\x35',  # (35) KE_IGNORE
@@ -208,6 +218,8 @@ _KEYCODE_REPR_LOOKUP.update({
     b'\xfd\x58': '<C-End>',
 })
 
+_KEYCODE_LOOKUP = {v: k for k, v in _KEYCODE_REPR_LOOKUP.items()}
+
 
 def get_keycode_repr(keycode):
     if keycode in _KEYCODE_REPR_LOOKUP:
@@ -217,3 +229,42 @@ def get_keycode_repr(keycode):
         key = ''.join('\\x{:02x}'.format(kc) for kc in keycode)
         key = '[' + key + ']'
     return key
+
+
+def get_keycode(keycode_repr):
+    return _KEYCODE_LOOKUP[keycode_repr]
+
+
+class Keys:
+    def __init__(self, raw_keys, keycodes, keycode_reprs):
+        # raw keypress representation saved by vim's -w
+        self.raw_keys = raw_keys
+        # list of parsed keycode byte strings
+        self.keycodes = keycodes
+        # list of human-readable key strings
+        self.keycode_reprs = keycode_reprs
+
+    @property
+    def score(self):
+        return len(self.keycodes)
+
+    @classmethod
+    def from_raw_keys(cls, raw_keys):
+        keycodes = parse_keycodes(raw_keys)
+        keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
+        keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
+        return Keys(
+            raw_keys=raw_keys,
+            keycodes=keycodes,
+            keycode_reprs=keycode_reprs,
+        )
+
+    @classmethod
+    def from_keycode_reprs(cls, keycode_reprs):
+        keycodes = [get_keycode(keycode_repr) for keycode_repr in keycode_reprs]
+        raw_keys = to_raw_keys(keycodes)
+        return Keys(
+            raw_keys=raw_keys,
+            keycodes=keycodes,
+            keycode_reprs=keycode_reprs
+        )
