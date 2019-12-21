@@ -4,7 +4,7 @@ import os
 import sys
 import urllib.parse
 
-from vimgolf import logger, GOLF_VIM, PLAY_VIMRC_PATH, GOLF_HOST, Failure
+from vimgolf import logger, PLAY_VIMRC_PATH, GOLF_HOST
 from vimgolf.challenge import get_challenge_url
 from vimgolf.keys import parse_keycodes, IGNORED_KEYSTROKES, get_keycode_repr
 from vimgolf.utils import write, input_loop, http_request
@@ -41,14 +41,7 @@ def play(challenge, workspace):
             '-W', logfile,  # keylog file (overwrites existing)
             infile,
         ]
-        try:
-            vim(play_args, check=True)
-        except Failure:
-            raise
-        except Exception:
-            logger.exception('{} execution failed'.format(GOLF_VIM))
-            write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
-            raise Failure()
+        vim(play_args, check=True)
 
         correct = filecmp.cmp(infile, outfile)
         with open(logfile, 'rb') as _f:
@@ -78,8 +71,8 @@ def play(challenge, workspace):
             write('Your score for this failed attempt:', color='red')
         write(score)
 
-        uploaded = False
         upload_eligible = challenge.id and challenge.compliant and challenge.api_key
+        uploaded = False
 
         while True:
             # Generate the menu items inside the loop since it can change across iterations

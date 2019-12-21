@@ -1,11 +1,22 @@
 import os
 import sys
 
-from vimgolf import GOLF_VIM, Failure
+from vimgolf import GOLF_VIM, Failure, logger
 from vimgolf.utils import find_executable, write, confirm
 
 
 def vim(args, **run_kwargs):
+    try:
+        _vim(args, **run_kwargs)
+    except Failure:
+        raise
+    except Exception:
+        logger.exception('{} execution failed'.format(GOLF_VIM))
+        write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
+        raise Failure()
+
+
+def _vim(args, **run_kwargs):
     vim_path = find_executable(GOLF_VIM)
     if not vim_path:
         write('Unable to find "{}"'.format(GOLF_VIM), color='red')
