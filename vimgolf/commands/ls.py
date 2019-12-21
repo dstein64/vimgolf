@@ -23,7 +23,7 @@ from vimgolf.utils import http_request, write, maybe_colorize, bool_to_mark
 
 def list_(page=None, limit=LISTING_LIMIT):
     logger.info('list_(%s, %s)', page, limit)
-    Listing = namedtuple('Listing', 'id name n_entries uploaded correct score')
+    Listing = namedtuple('Listing', 'id name n_entries uploaded score')
     stored_challenges = get_stored_challenges()
     try:
         listings = []
@@ -52,7 +52,6 @@ def list_(page=None, limit=LISTING_LIMIT):
                 name=name,
                 n_entries=n_entries,
                 uploaded=stored_metadata.get('uploaded'),
-                correct=stored_metadata.get('correct'),
                 score=stored_metadata.get('best_score')
             )
             listings.append(listing)

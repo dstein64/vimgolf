@@ -6,6 +6,23 @@ This project contains a [vimgolf](https://www.vimgolf.com/) client written in Py
 The user interface is similar to the [official vimgolf client](https://github.com/igrigorik/vimgolf),
 with a few additions inspired by [vimgolf-finder](https://github.com/kciter/vimgolf-finder).
 
+This forked version of [dstein64/vimgolf](https://github.com/dstein64/vimgolf) contains the following
+additional features:
+
+- Use locally cached version of challenge when running `vimgolf put`, if one exists.
+- Keep local version of challenges and track all entered solutions in 
+  `$XDG_DATA_HOME/vimgolf/challenges`.
+- Update `vimgolf list` to show output in a table.
+- Update `vimgolf list` to show whether a challenge was already submitted and 
+  what is the best score achieved for it so far (only applies to challenges submitted through
+  this client).
+- `vimgolf show` accepts an optional `--tracked` flag. When supplied, `vimgolf` will display
+  additional information about previously entered solutions to the given challenge.
+  Specifically, for each entered solution, it will display the key sequence entered, whether
+  it was correct, whether it was submitted to vimgolf.com, what score did it achieve and when
+  was it entered.
+  
+
 Installation
 ------------
 
