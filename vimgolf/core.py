@@ -14,20 +14,20 @@ import urllib.request
 from terminaltables import AsciiTable
 
 from vimgolf import (
+    __version__,
+    logger,
+    Status,
     VIMGOLF_API_KEY_PATH,
     VIMGOLF_ID_LOOKUP_PATH,
     EXPANSION_PREFIX,
     GOLF_HOST,
     VIMGOLF_CHALLENGES_PATH,
-    logger,
     GOLF_VIM,
     PLAY_VIMRC_PATH,
     RUBY_CLIENT_VERSION_COMPLIANCE,
-    __version__,
     LISTING_LIMIT,
     MAX_REQUEST_WORKERS,
     LEADER_LIMIT,
-    Status
 )
 from vimgolf.html import (
     get_elements_by_classname,
@@ -38,8 +38,8 @@ from vimgolf.html import (
     parse_html,
 )
 from vimgolf.keys import (
-    get_keycode_repr,
     IGNORED_KEYSTROKES,
+    get_keycode_repr,
     parse_keycodes,
 )
 from vimgolf.utils import (

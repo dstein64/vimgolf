@@ -3,9 +3,9 @@ import sys
 
 import click
 
-from vimgolf import EXIT_SUCCESS, Status, EXIT_FAILURE
+from vimgolf import Status, EXIT_SUCCESS, EXIT_FAILURE, __version__
 from vimgolf.utils import write
-from vimgolf.core import config, show, list_, put, local, __version__
+from vimgolf.core import config, show, list_, put, local
 
 
 @click.group()
