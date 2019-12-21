@@ -5,7 +5,7 @@ import click
 
 from vimgolf import EXIT_SUCCESS, Status, EXIT_FAILURE
 from vimgolf.utils import write
-from vimgolf.vimgolf import config, show, list_, put, local, __version__
+from vimgolf.core import config, show, list_, put, local, __version__
 
 
 @click.group()
