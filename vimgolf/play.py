@@ -4,58 +4,15 @@ import os
 import sys
 import urllib.parse
 
-from vimgolf import logger, GOLF_VIM, Status, PLAY_VIMRC_PATH, GOLF_HOST
+from vimgolf import logger, GOLF_VIM, PLAY_VIMRC_PATH, GOLF_HOST, Failure
 from vimgolf.challenge import get_challenge_url
 from vimgolf.keys import parse_keycodes, IGNORED_KEYSTROKES, get_keycode_repr
-from vimgolf.utils import find_executable, write, confirm, input_loop, http_request
+from vimgolf.utils import write, input_loop, http_request
+from vimgolf.vim import vim
 
 
 def play(challenge, workspace):
     logger.info('play(...)')
-
-    vim_path = find_executable(GOLF_VIM)
-    if not vim_path:
-        write('Unable to find "{}"'.format(GOLF_VIM), color='red')
-        write('Please update your PATH to include the directory with "{}"'.format(GOLF_VIM), color='red')
-        return Status.FAILURE
-    vim_name = os.path.basename(os.path.realpath(vim_path))
-
-    if sys.platform == 'win32':
-        # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'
-        base, ext = os.path.splitext(vim_name)
-        pathexts = os.environ.get('PATHEXT', '.EXE').split(os.pathsep)
-        for pathext in pathexts:
-            if ext.upper() == pathext.upper():
-                vim_name = base
-                break
-
-    # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
-    # Issue a warning as opposed to failing, since this may change.
-    if vim_name == 'nvim-qt' and sys.platform == 'win32':
-        write('vimgolf with nvim-qt on Windows may not function properly', color='red')
-        write('If there are issues, please try using a different version of vim', color='yellow')
-        if not confirm('Continue trying to play?'):
-            return Status.FAILURE
-
-    def vim(args, **run_kwargs):
-        # Configure args used by all vim invocations (for both playing and diffing)
-        # 'vim_path' is used instead of GOLF_VIM to handle 'vim.bat' on the PATH.
-        # subprocess.run would not launch vim.bat with GOLF_VIM == 'vim', but 'find_executable'
-        # will return the full path to vim.bat in that case.
-        vim_args = [vim_path]
-        # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
-        # Add special-case handling since nvim doesn't accept that option.
-        if vim_name != 'nvim':
-            vim_args.append('--nofork')
-        # For nvim-qt, options after '--' are passed to nvim.
-        if vim_name == 'nvim-qt':
-            vim_args.append('--')
-        vim_args.extend(args)
-        os.subprocess.run(vim_args, **run_kwargs)
-        # On Windows, vimgolf freezes when reading input after nvim's exit.
-        # For an unknown reason, shell'ing out an effective no-op works-around the issue
-        if vim_name == 'nvim' and sys.platform == 'win32':
-            os.system('')
 
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
@@ -86,10 +43,12 @@ def play(challenge, workspace):
         ]
         try:
             vim(play_args, check=True)
+        except Failure:
+            raise
         except Exception:
             logger.exception('{} execution failed'.format(GOLF_VIM))
             write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
-            return Status.FAILURE
+            raise Failure()
 
         correct = filecmp.cmp(infile, outfile)
         with open(logfile, 'rb') as _f:
@@ -142,8 +101,8 @@ def play(challenge, workspace):
                 diff_args = ['-d', '-n', infile, outfile]
                 vim(diff_args)
             elif selection == 'w':
-                upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
-                if upload_status == Status.SUCCESS:
+                success = upload_result(challenge.id, challenge.api_key, raw_keys)
+                if success:
                     write('Uploaded entry!', color='green')
                     leaderboard_url = get_challenge_url(challenge.id)
                     write('View the leaderboard: {}'.format(leaderboard_url), color='green')
@@ -169,12 +128,11 @@ def play(challenge, workspace):
         write('Retrying vimgolf challenge', color='yellow')
 
     write('Thanks for playing!', color='green')
-    return Status.SUCCESS
 
 
 def upload_result(challenge_id, api_key, raw_keys):
     logger.info('upload_result(...)')
-    status = Status.FAILURE
+    success = False
     try:
         url = urllib.parse.urljoin(GOLF_HOST, '/entry.json')
         data_dict = {
@@ -186,7 +144,7 @@ def upload_result(challenge_id, api_key, raw_keys):
         response = http_request(url, data=data)
         message = json.loads(response.body)
         if message.get('status') == 'ok':
-            status = Status.SUCCESS
+            success = True
     except Exception:
         logger.exception('upload failed')
-    return status
+    return success

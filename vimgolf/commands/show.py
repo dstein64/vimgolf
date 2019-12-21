@@ -8,10 +8,10 @@ from terminaltables import AsciiTable
 
 from vimgolf import (
     logger,
-    Status,
     GOLF_HOST,
     MAX_REQUEST_WORKERS,
     LEADER_LIMIT,
+    Failure,
 )
 from vimgolf.challenge import (
     expand_challenge_id,
@@ -36,7 +36,7 @@ def show(challenge_id, tracked=False):
     try:
         if not validate_challenge_id(challenge_id):
             show_challenge_id_error()
-            return Status.FAILURE
+            raise Failure()
         api_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
         page_url = get_challenge_url(challenge_id)
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_REQUEST_WORKERS) as executor:
@@ -124,10 +124,10 @@ def show(challenge_id, tracked=False):
             if len(answer_rows) > 1:
                 write(AsciiTable(answer_rows).table)
 
+    except Failure:
+        raise
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
-        return Status.FAILURE
-
-    return Status.SUCCESS
+        raise Failure()

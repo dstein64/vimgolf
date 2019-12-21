@@ -8,8 +8,8 @@ from vimgolf import (
     LISTING_LIMIT,
     logger,
     GOLF_HOST,
-    Status,
     EXPANSION_PREFIX,
+    Failure,
 )
 from vimgolf.challenge import get_stored_challenges, set_id_lookup
 from vimgolf.html import (
@@ -56,10 +56,12 @@ def list_(page=None, limit=LISTING_LIMIT):
                 score=stored_metadata.get('best_score')
             )
             listings.append(listing)
+    except Failure:
+        raise
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge list retrieval has failed', stream=sys.stderr, color='red')
-        return Status.FAILURE
+        raise Failure()
 
     table_rows = [['#', 'Name', 'Entries', 'ID', 'Submitted', 'Score']]
 
@@ -78,5 +80,3 @@ def list_(page=None, limit=LISTING_LIMIT):
 
     id_lookup = {str(idx+1): listing.id for idx, listing in enumerate(listings)}
     set_id_lookup(id_lookup)
-
-    return Status.SUCCESS

@@ -14,8 +14,7 @@ def get_api_key():
     if not os.path.exists(VIMGOLF_API_KEY_PATH):
         return None
     with open(VIMGOLF_API_KEY_PATH, 'r') as f:
-        api_key = f.read()
-        return api_key
+        return f.read()
 
 
 def set_api_key(api_key):

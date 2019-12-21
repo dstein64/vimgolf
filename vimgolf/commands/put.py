@@ -7,9 +7,9 @@ import urllib.parse
 from vimgolf import (
     __version__,
     logger,
-    Status,
     GOLF_HOST,
     RUBY_CLIENT_VERSION_COMPLIANCE,
+    Failure,
 )
 from vimgolf.api_key import get_api_key, validate_api_key, show_api_key_help
 from vimgolf.challenge import (
@@ -27,14 +27,14 @@ def put(challenge_id):
     logger.info('put(%s)', challenge_id)
     if not validate_challenge_id(challenge_id):
         show_challenge_id_error()
-        return Status.FAILURE
+        raise Failure()
     api_key = get_api_key()
     if not validate_api_key(api_key):
         write('An API key has not been configured', color='red')
         write('Uploading to vimgolf.com is disabled', color='red')
         show_api_key_help()
         if not confirm('Play without uploads?'):
-            return Status.FAILURE
+            raise Failure()
 
     try:
         cached_challenge = Challenge(challenge_id)
@@ -62,7 +62,7 @@ def put(challenge_id):
                 action = 'update'
             write('Please {} vimgolf to a compliant version'.format(action), color='yellow')
             if not confirm('Try to play without uploads?'):
-                return Status.FAILURE
+                raise Failure()
 
         in_text = format_(challenge_spec['in']['data'])
         out_text = format_(challenge_spec['out']['data'])
@@ -71,11 +71,13 @@ def put(challenge_id):
         # Sanitize and add leading dot
         in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
         out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
+    except Failure:
+        raise
     except Exception:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
-        return Status.FAILURE
+        raise Failure()
 
     challenge = Challenge(
         in_text=in_text,
@@ -88,7 +90,5 @@ def put(challenge_id):
     )
     challenge.save(spec=challenge_spec)
     with tempfile.TemporaryDirectory() as d:
-        status = play(challenge, d)
+        play(challenge, d)
     challenge.update_metadata()
-
-    return status

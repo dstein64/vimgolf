@@ -5,8 +5,6 @@ import urllib.request
 from collections import namedtuple
 from pathlib import Path
 
-from vimgolf import EXIT_FAILURE
-
 USER_AGENT = 'vimgolf'
 
 HttpResponse = namedtuple('HttpResponse', 'code msg headers body')
@@ -84,7 +82,7 @@ def input_loop(prompt, strip=True, required=True):
             return selection
         except EOFError:
             write('', stream=sys.stderr)
-            sys.exit(EXIT_FAILURE)
+            sys.exit(1)
         except KeyboardInterrupt:
             write('', stream=sys.stderr)
             write('KeyboardInterrupt', stream=sys.stderr)

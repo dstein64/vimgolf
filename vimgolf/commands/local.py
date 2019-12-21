@@ -23,5 +23,4 @@ def local(infile, outfile):
         id=None,
     )
     with tempfile.TemporaryDirectory() as d:
-        status = play(challenge, d)
-    return status
+        play(challenge, d)

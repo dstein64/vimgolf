@@ -3,7 +3,6 @@ import glob
 import logging
 import os
 import sys
-from enum import Enum
 
 version_txt = os.path.join(os.path.dirname(__file__), 'version.txt')
 with open(version_txt, 'r') as vf:
@@ -97,10 +96,5 @@ for log in stale_existing_logs:
         logger.exception('error deleting stale log: {}'.format(log))
 
 
-class Status(Enum):
-    SUCCESS = 1
-    FAILURE = 2
-
-
-EXIT_SUCCESS = 0
-EXIT_FAILURE = 1
+class Failure(Exception):
+    pass

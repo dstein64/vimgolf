@@ -3,8 +3,11 @@ import sys
 
 import click
 
-from vimgolf import commands
-from vimgolf import Status, EXIT_SUCCESS, EXIT_FAILURE, __version__
+from vimgolf import (
+    commands,
+    Failure,
+    __version__,
+)
 from vimgolf.utils import write
 
 
@@ -16,9 +19,10 @@ def main():
 def exit_status(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        status = fn(*args, **kwargs)
-        exit_code = EXIT_SUCCESS if status == Status.SUCCESS else EXIT_FAILURE
-        sys.exit(exit_code)
+        try:
+            fn(*args, **kwargs)
+        except Failure:
+            sys.exit(1)
     return wrapper
 
 
@@ -33,7 +37,7 @@ command = main.command
 @exit_status
 def local(in_file, out_file):
     """launch local challenge """
-    return commands.local(in_file, out_file)
+    commands.local(in_file, out_file)
 
 
 @command()
@@ -41,7 +45,7 @@ def local(in_file, out_file):
 @exit_status
 def put(challenge_id):
     """launch vimgolf.com challenge"""
-    return commands.put(challenge_id)
+    commands.put(challenge_id)
 
 
 @command('list')
@@ -59,7 +63,7 @@ def list_(spec):
             kwargs['limit'] = int(parts[1])
     except Exception:
         pass
-    return commands.list_(**kwargs)
+    commands.list_(**kwargs)
 
 
 @command()
@@ -68,7 +72,7 @@ def list_(spec):
 @exit_status
 def show(challenge_id, tracked):
     """show vimgolf.com challenge"""
-    return commands.show(challenge_id, tracked)
+    commands.show(challenge_id, tracked)
 
 
 @command()
@@ -76,7 +80,7 @@ def show(challenge_id, tracked):
 @exit_status
 def config(api_key):
     """configure your vimgolf.com credentials"""
-    return commands.config(api_key or None)
+    commands.config(api_key or None)
 
 
 @command('version')
