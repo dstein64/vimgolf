@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 
 from vimgolf import GOLF_VIM, Failure, logger
@@ -54,7 +55,7 @@ def _vim(args, **run_kwargs):
     if vim_name == 'nvim-qt':
         vim_args.append('--')
     vim_args.extend(args)
-    os.subprocess.run(vim_args, **run_kwargs)
+    subprocess.run(vim_args, **run_kwargs)
     # On Windows, vimgolf freezes when reading input after nvim's exit.
     # For an unknown reason, shell'ing out an effective no-op works-around the issue
     if vim_name == 'nvim' and sys.platform == 'win32':

@@ -25,25 +25,32 @@ def play(challenge, workspace):
         f.write(challenge.out_text)
 
     write('Launching vimgolf session', color='yellow')
+    main_loop(challenge, infile, logfile, outfile)
+    write('Thanks for playing!', color='green')
+
+
+def main_loop(challenge, infile, logfile, outfile):
+    vimrc = PLAY_VIMRC_PATH
+    play_args = [
+        '-Z',  # restricted mode, utilities not allowed
+        '-n',  # no swap file, memory only editing
+        '--noplugin',  # no plugins
+        '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
+        '+0',  # start on line 0
+        '-u', vimrc,  # vimgolf .vimrc
+        '-U', 'NONE',  # don't load .gvimrc
+        '-W', logfile,  # keylog file (overwrites existing)
+        infile,
+    ]
+
     while True:
         with open(infile, 'w') as f:
             f.write(challenge.in_text)
 
-        vimrc = PLAY_VIMRC_PATH
-        play_args = [
-            '-Z',           # restricted mode, utilities not allowed
-            '-n',           # no swap file, memory only editing
-            '--noplugin',   # no plugins
-            '-i', 'NONE',   # don't load .viminfo (e.g., has saved macros, etc.)
-            '+0',           # start on line 0
-            '-u', vimrc,    # vimgolf .vimrc
-            '-U', 'NONE',   # don't load .gvimrc
-            '-W', logfile,  # keylog file (overwrites existing)
-            infile,
-        ]
         vim(play_args, check=True)
 
         correct = filecmp.cmp(infile, outfile)
+
         with open(logfile, 'rb') as _f:
             # raw keypress representation saved by vim's -w
             raw_keys = _f.read()
@@ -71,42 +78,13 @@ def play(challenge, workspace):
             write('Your score for this failed attempt:', color='red')
         write(score)
 
-        upload_eligible = challenge.id and challenge.compliant and challenge.api_key
-        uploaded = False
-
-        while True:
-            # Generate the menu items inside the loop since it can change across iterations
-            # (e.g., upload option can be removed)
-            menu = []
-            if not correct:
-                menu.append(('d', 'Show diff'))
-            if upload_eligible and correct:
-                menu.append(('w', 'Upload result'))
-            menu.append(('r', 'Retry the current challenge'))
-            menu.append(('q', 'Quit vimgolf'))
-            valid_codes = [x[0] for x in menu]
-            for opt in menu:
-                write('[{}] {}'.format(*opt), color='yellow')
-            selection = input_loop('Choice> ')
-            if selection not in valid_codes:
-                write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
-            elif selection == 'd':
-                diff_args = ['-d', '-n', infile, outfile]
-                vim(diff_args)
-            elif selection == 'w':
-                success = upload_result(challenge.id, challenge.api_key, raw_keys)
-                if success:
-                    write('Uploaded entry!', color='green')
-                    leaderboard_url = get_challenge_url(challenge.id)
-                    write('View the leaderboard: {}'.format(leaderboard_url), color='green')
-                    uploaded = True
-                    upload_eligible = False
-                else:
-                    write('The entry upload has failed', stream=sys.stderr, color='red')
-                    message = 'Please check your API key on vimgolf.com'
-                    write(message, stream=sys.stderr, color='red')
-            else:
-                break
+        should_break, uploaded = menu_loop(
+            challenge=challenge,
+            correct=correct,
+            infile=infile,
+            outfile=outfile,
+            raw_keys=raw_keys
+        )
 
         if challenge.id:
             challenge.add_answer(
@@ -116,11 +94,55 @@ def play(challenge, workspace):
                 uploaded=uploaded,
             )
 
-        if selection == 'q':
+        if should_break:
             break
-        write('Retrying vimgolf challenge', color='yellow')
 
-    write('Thanks for playing!', color='green')
+
+def menu_loop(
+        challenge,
+        correct,
+        infile,
+        outfile,
+        raw_keys):
+    upload_eligible = challenge.id and challenge.compliant and challenge.api_key
+    uploaded = False
+    while True:
+        # Generate the menu items inside the loop since it can change across iterations
+        # (e.g., upload option can be removed)
+        menu = []
+        if not correct:
+            menu.append(('d', 'Show diff'))
+        if upload_eligible and correct:
+            menu.append(('w', 'Upload result'))
+        menu.append(('r', 'Retry the current challenge'))
+        menu.append(('q', 'Quit vimgolf'))
+        valid_codes = [x[0] for x in menu]
+        for opt in menu:
+            write('[{}] {}'.format(*opt), color='yellow')
+        selection = input_loop('Choice> ')
+        if selection not in valid_codes:
+            write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
+        elif selection == 'd':
+            diff_args = ['-d', '-n', infile, outfile]
+            vim(diff_args)
+        elif selection == 'w':
+            success = upload_result(challenge.id, challenge.api_key, raw_keys)
+            if success:
+                write('Uploaded entry!', color='green')
+                leaderboard_url = get_challenge_url(challenge.id)
+                write('View the leaderboard: {}'.format(leaderboard_url), color='green')
+                uploaded = True
+                upload_eligible = False
+            else:
+                write('The entry upload has failed', stream=sys.stderr, color='red')
+                message = 'Please check your API key on vimgolf.com'
+                write(message, stream=sys.stderr, color='red')
+        else:
+            break
+    should_quit = selection == 'q'
+    if not should_quit:
+        write('Retrying vimgolf challenge', color='yellow')
+    return should_quit, uploaded
 
 
 def upload_result(challenge_id, api_key, raw_keys):
