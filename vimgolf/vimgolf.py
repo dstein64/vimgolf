@@ -89,7 +89,7 @@ LISTING_LIMIT = 10
 LEADER_LIMIT = 3
 
 # Max number of existing logs to retain
-LOG_LIMIT = 10
+LOG_LIMIT = 100
 
 # Max number of parallel web requests.
 # As of 2018, most browsers use a max of six connections per hostname.
@@ -453,6 +453,7 @@ def play(challenge, workspace):
             return Status.FAILURE
 
         correct = filecmp.cmp(infile, outfile)
+        logger.info('correct: %s', str(correct).lower())
         with open(logfile, 'rb') as _f:
             # raw keypress representation saved by vim's -w
             raw_keys = _f.read()
@@ -463,8 +464,10 @@ def play(challenge, workspace):
 
         # list of human-readable key strings
         keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
+        logger.info('keys: %s', ''.join(keycode_reprs))
 
         score = len(keycodes)
+        logger.info('score: %d', score)
 
         write('Here are your keystrokes:', color='green')
         for keycode_repr in keycode_reprs:
