@@ -41,6 +41,7 @@ jobs:
         vimgolf help
         vimgolf version
         vimgolf config
+        vimgolf config 0
         vimgolf config 00000000000000000000000000000000
         vimgolf config
         vimgolf list
