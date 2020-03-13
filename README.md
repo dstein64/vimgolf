@@ -1,3 +1,5 @@
+[![Build Status](https://github.com/dstein64/vimgolf/workflows/build/badge.svg)](https://github.com/dstein64/vimgolf/actions)
+
 vimgolf
 =======
 
