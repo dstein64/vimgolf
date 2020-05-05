@@ -1,5 +1,11 @@
 import unittest
 
+from vimgolf.html import (
+    get_element_by_id,
+    get_elements_by_tagname,
+    get_text,
+    parse_html,
+)
 from vimgolf.vimgolf import (
     get_api_key,
     GOLF_HOST,
@@ -7,12 +13,6 @@ from vimgolf.vimgolf import (
     main,
     RUBY_CLIENT_VERSION_COMPLIANCE,
     set_api_key,
-)
-from vimgolf.html import (
-    get_element_by_id,
-    get_elements_by_tagname,
-    get_text,
-    parse_html,
 )
 
 # XXX: The current tests are limited, only checking that some commands can run
