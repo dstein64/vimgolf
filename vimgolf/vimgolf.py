@@ -748,7 +748,9 @@ def config(api_key=None):
 # * Command Line Interface
 # ************************************************************
 
-def main(argv=sys.argv):
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
     logger.info('main(%s)', argv)
     if len(argv) < 2:
         command = 'help'
