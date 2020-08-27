@@ -5,6 +5,9 @@ version_txt = os.path.join(os.path.dirname(__file__), 'vimgolf', 'version.txt')
 with open(version_txt, 'r') as f:
     version = f.read().strip()
 
+with open('README.md') as f:
+    long_description = f.read()
+
 setup(
     author='Daniel Steinberg',
     author_email='ds@dannyadam.com',
@@ -28,7 +31,7 @@ setup(
     },
     keywords=['vim', 'vimgolf'],
     license='MIT',
-    long_description=open('README.md').read(),
+    long_description=long_description,
     long_description_content_type='text/markdown',
     name='vimgolf',
     package_data={'vimgolf': ['version.txt', 'vimgolf.vimrc']},
