@@ -1,4 +1,3 @@
-import time
 import unittest
 
 from vimgolf.html import (
@@ -29,10 +28,6 @@ class TestVimgolf(unittest.TestCase):
     def tearDownClass(cls):
         if cls._saved_api_key is not None:
             set_api_key(cls._saved_api_key)
-
-    def tearDown(self):
-        # Sleep between tests, to try to prevent network issues from vimgolf.com.
-        time.sleep(2)
 
     def test_help_command(self):
         self.assertEqual(main(['vimgolf', 'help']), 0)
