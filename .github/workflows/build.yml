@@ -12,6 +12,8 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      # Run jobs sequentially to prevent network issues from vimgolf.com.
+      max-parallel: 1
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
