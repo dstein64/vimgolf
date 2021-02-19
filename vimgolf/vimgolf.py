@@ -381,14 +381,18 @@ def play(challenge, workspace):
         return Status.FAILURE
     vim_name = os.path.basename(os.path.realpath(vim_path))
 
+    # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'.
+    exe_exts = []
     if sys.platform == 'win32':
-        # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'
-        base, ext = os.path.splitext(vim_name)
-        pathexts = os.environ.get('PATHEXT', '.EXE').split(os.pathsep)
-        for pathext in pathexts:
-            if ext.upper() == pathext.upper():
-                vim_name = base
-                break
+        exe_exts.extend(os.environ.get('PATHEXT', '.EXE').split(os.pathsep))
+    elif sys.platform == 'linux':
+        # Neovim Linux nightly releases are distributed as an AppImage (nvim.appimage).
+        exe_exts.append('.appimage')
+    base, ext = os.path.splitext(vim_name)
+    for exe_ext in exe_exts:
+        if ext.upper() == exe_ext.upper():
+            vim_name = base
+            break
 
     # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
     # Issue a warning as opposed to failing, since this may change.
