@@ -148,15 +148,15 @@ HttpResponse = namedtuple('HttpResponse', 'code msg headers body')
 
 def http_request(url, data=None):
     request = urllib.request.Request(url, data, headers={'User-Agent': USER_AGENT})
-    response = urllib.request.urlopen(request)
-    try:
-        charset = response.getheader('Content-Type').split(';')[1].split('=')[1].strip()
-    except Exception:
-        charset = 'utf-8'
-    body = response.read().decode(charset)
-    output = HttpResponse(
-        code=response.code, msg=response.msg, headers=response.getheaders(), body=body)
-    return output
+    with urllib.request.urlopen(request) as response:
+        try:
+            charset = response.getheader('Content-Type').split(';')[1].split('=')[1].strip()
+        except Exception:
+            charset = 'utf-8'
+        body = response.read().decode(charset)
+        output = HttpResponse(
+            code=response.code, msg=response.msg, headers=response.getheaders(), body=body)
+        return output
 
 
 def join_lines(string):
