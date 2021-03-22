@@ -51,11 +51,11 @@ class TestVimgolf(unittest.TestCase):
 
     def test_show_command(self):
         # First 'list', so that a relative ID (e.g., +1) can be used.
-        self.assertEqual(main(['vimgolf', 'list']), 0)
+        self.assertEqual(main(['vimgolf', 'list', '10']), 0)
         self.assertEqual(main(['vimgolf', 'show', '+1']), 0)
-        # The following ID is for 'Simple, Practical, and Common'
-        # http://www.vimgolf.com/challenges/55b18bbea9c2c30d04000001
-        challenge_id = '55b18bbea9c2c30d04000001'
+        # The following ID is for 'Pascal's Triangle'
+        # http://www.vimgolf.com/challenges/5ca2bc786b547e000c77fd52
+        challenge_id = '5ca2bc786b547e000c77fd52'
         self.assertEqual(main(['vimgolf', 'show', challenge_id]), 0)
 
     def test_ruby_client_version(self):
