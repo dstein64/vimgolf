@@ -22,7 +22,7 @@ jobs:
       # The default $ErrorActionPreference is 'Continue', which can result in multiline
       # commands not failing when an individual command fails.
       if: startsWith(matrix.os, 'windows-')
-      run: echo '$ErrorActionPreference = "Stop"' >> $GITHUB_ENV
+      run: Add-Content -Path $env:GITHUB_ENV -Value "ErrorActionPreference=Stop" -Encoding utf8
 
     - name: Checkout
       uses: actions/checkout@v2
