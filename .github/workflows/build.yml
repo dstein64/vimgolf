@@ -18,13 +18,6 @@ jobs:
         python-version: [3.5, 3.6, 3.7, 3.8, 3.9]
 
     steps:
-    - name: Prepare PowerShell (windows)
-      # The default $ErrorActionPreference is 'Continue', which can result in multiline
-      # commands not failing when an individual command fails.
-      if: startsWith(matrix.os, 'windows-')
-      env:
-        ErrorActionPreference: Stop
-
     - name: Checkout
       uses: actions/checkout@v2
 
@@ -47,6 +40,10 @@ jobs:
         pip install .
 
     - name: Test
+      env:
+        # On PowerShell, the default $ErrorActionPreference is 'Continue', which can result
+        # in multiline commands not failing when an individual command fails.
+        ErrorActionPreference: Stop
       run: |
         python -m unittest discover tests -v
         # make sure the vimgolf executable runs
