@@ -1,3 +1,5 @@
+from contextlib import redirect_stdout
+import io
 import unittest
 
 from vimgolf.html import (
@@ -51,8 +53,13 @@ class TestVimgolf(unittest.TestCase):
 
     def test_show_command(self):
         # First 'list', so that a relative ID (e.g., +1) can be used.
-        self.assertEqual(main(['vimgolf', 'list', '10']), 0)
-        self.assertEqual(main(['vimgolf', 'show', '+1']), 0)
+        with io.StringIO() as string_io, redirect_stdout(string_io):
+            self.assertEqual(main(['vimgolf', 'list', '11:50']), 0)
+            entry_counts = [int(x.split()[-3]) for x in string_io.getvalue().split('\n') if x]
+        # Use the challenge with fewest entries to avoid VimGolf Issue #306.
+        #   https://github.com/igrigorik/vimgolf/issues/306
+        entry = min((x, idx) for idx, x in enumerate(entry_counts))[1] + 1
+        self.assertEqual(main(['vimgolf', 'show', f'+{entry}']), 0)
         # The following ID is for 'Pascal's Triangle'
         # http://www.vimgolf.com/challenges/5ca2bc786b547e000c77fd52
         challenge_id = '5ca2bc786b547e000c77fd52'
