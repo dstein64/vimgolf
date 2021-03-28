@@ -39,12 +39,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install .
 
-    - name: Test
-      shell: pwsh
-      run: |
-        # On PowerShell, the default $ErrorActionPreference is 'Continue', which can result
-        # in multiline commands not failing when an individual command fails.
-        $ErrorActionPreference = 'Stop'
-        python -m unittest discover tests -v
-        # make sure the vimgolf executable runs
-        vimgolf
+    # On PowerShell, a step does not fail when an intermediate command in a multiline command
+    # fails. Adding '$ErrorActionPreference = "Stop"' didn't resolve the issue. The issue is
+    # avoided by using a separate step for each test command.
+
+    - name: Run Tests
+      run: python -m unittest discover tests -v
+
+    - name: Ensure Executable Runs
+      run: vimgolf
