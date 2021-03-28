@@ -40,11 +40,11 @@ jobs:
         pip install .
 
     - name: Test
-      env:
+      shell: pwsh
+      run: |
         # On PowerShell, the default $ErrorActionPreference is 'Continue', which can result
         # in multiline commands not failing when an individual command fails.
-        $ErrorActionPreference: 'Stop'
-      run: |
+        $ErrorActionPreference = 'Stop'
         python -m unittest discover tests -v
         # make sure the vimgolf executable runs
         vimgolf
