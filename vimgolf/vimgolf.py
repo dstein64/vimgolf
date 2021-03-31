@@ -661,64 +661,93 @@ def show(challenge_id):
         if not validate_challenge_id(challenge_id):
             show_challenge_id_error()
             return Status.FAILURE
+        # === Retrieve API response and HTML page response ===
         api_url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
         page_url = get_challenge_url(challenge_id)
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_REQUEST_WORKERS) as executor:
             results = executor.map(http_request, [api_url, page_url])
             api_response = next(results)
-            page_response = next(results)
-        challenge_spec = json.loads(api_response.body)
-        start_file = challenge_spec['in']['data']
-        if not start_file.endswith('\n'):
-            start_file += '\n'
-        end_file = challenge_spec['out']['data']
-        if not end_file.endswith('\n'):
-            end_file += '\n'
-        nodes = parse_html(page_response.body)
-        content_element = get_element_by_id(nodes, 'content')
-        content_grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
-        name_h3 = get_elements_by_tagname(content_grid_7_element.children, 'h3')[0]
-        name = join_lines(get_text([name_h3]).strip())
-        description_p_element = get_elements_by_tagname(content_grid_7_element.children, 'p')[0]
-        description = join_lines(get_text([description_p_element]).strip())
-        content_grid_5_element = get_elements_by_classname(content_element.children, 'grid_5')[0]
+            try:
+                # A response may not be retrieved due to VimGolf Issue #306.
+                #   https://github.com/igrigorik/vimgolf/issues/306
+                page_response = next(results)
+            except Exception:
+                page_response = None
+
+        # === Extract data from responses ===
         Leader = namedtuple('Leader', 'username score')
-        leaders = []
-        leaderboard_divs = get_elements_by_tagname(content_grid_5_element.children, 'div')
-        for leaderboard_div in leaderboard_divs:
-            user_h6 = get_elements_by_tagname(leaderboard_div.children, 'h6')[0]
-            username_anchor = get_elements_by_tagname(user_h6.children, 'a')[1]
-            username = get_text([username_anchor]).strip()
-            if username.startswith('@'):
-                username = username[1:]
-            score_div = get_elements_by_tagname(leaderboard_div.children, 'div')[0]
-            score = int(get_text([score_div]).strip())
-            leader = Leader(username=username, score=score)
-            leaders.append(leader)
+        class Showing:
+            pass
+        showing = Showing()
+        showing.challenge_id = challenge_id
+        showing.name = None
+        showing.page_url = page_url
+        showing.leaders = None
+        showing.description = None
+        if page_response is not None:
+            nodes = parse_html(page_response.body)
+            content_element = get_element_by_id(nodes, 'content')
+            content_grid_7_element = get_elements_by_classname(content_element.children, 'grid_7')[0]
+            name_h3 = get_elements_by_tagname(content_grid_7_element.children, 'h3')[0]
+            showing.name = join_lines(get_text([name_h3]).strip())
+            description_p_element = get_elements_by_tagname(content_grid_7_element.children, 'p')[0]
+            showing.description = join_lines(get_text([description_p_element]).strip())
+            content_grid_5_element = get_elements_by_classname(content_element.children, 'grid_5')[0]
+            leaderboard_divs = get_elements_by_tagname(content_grid_5_element.children, 'div')
+            showing.leaders = []
+            for leaderboard_div in leaderboard_divs:
+                user_h6 = get_elements_by_tagname(leaderboard_div.children, 'h6')[0]
+                username_anchor = get_elements_by_tagname(user_h6.children, 'a')[1]
+                username = get_text([username_anchor]).strip()
+                if username.startswith('@'):
+                    username = username[1:]
+                score_div = get_elements_by_tagname(leaderboard_div.children, 'div')[0]
+                score = int(get_text([score_div]).strip())
+                leader = Leader(username=username, score=score)
+                showing.leaders.append(leader)
+        challenge_spec = json.loads(api_response.body)
+        showing.start_file = challenge_spec['in']['data']
+        if not showing.start_file.endswith('\n'):
+            showing.start_file += '\n'
+        showing.end_file = challenge_spec['out']['data']
+        if not showing.end_file.endswith('\n'):
+            showing.end_file += '\n'
+
+        # === Show extracted data ===
         separator = '-' * 50
-        write(separator)
-        write('{} ('.format(name), end=None)
-        write(challenge_id, color='yellow', end=None)
-        write(')')
+        if page_response is None:
+            logger.warning('not all challenge information retrieved')
+            write(separator)
+            write('Some information could not be retrieved.', color='red')
+        if showing.name is not None:
+            write(separator)
+            write('{} ('.format(showing.name), end=None)
+            write(challenge_id, color='yellow', end=None)
+            write(')')
+        else:
+            write(separator)
+            write(challenge_id, color='yellow')
         write(separator)
         write(page_url)
-        write(separator)
-        write('Leaderboard', color='green')
-        if leaders:
-            for leader in leaders[:LEADER_LIMIT]:
-                write('{} {}'.format(leader.username.ljust(15), leader.score))
-            if len(leaders) > LEADER_LIMIT:
-                write('...')
-        else:
-            write('no entries yet', color='yellow')
-        write(separator)
-        write(description)
+        if showing.leaders is not None:
+            write(separator)
+            write('Leaderboard', color='green')
+            if showing.leaders:
+                for leader in showing.leaders[:LEADER_LIMIT]:
+                    write('{} {}'.format(leader.username.ljust(15), leader.score))
+                if len(showing.leaders) > LEADER_LIMIT:
+                    write('...')
+            else:
+                write('no entries yet', color='yellow')
+        if showing.description is not None:
+            write(separator)
+            write(showing.description)
         write(separator)
         write('Start File', color='green')
-        write(start_file, end=None)
+        write(showing.start_file, end=None)
         write(separator)
         write('End File', color='green')
-        write(end_file, end=None)
+        write(showing.end_file, end=None)
         write(separator)
     except Exception:
         logger.exception('challenge retrieval failed')

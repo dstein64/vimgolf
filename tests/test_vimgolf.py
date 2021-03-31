@@ -62,8 +62,13 @@ class TestVimgolf(unittest.TestCase):
         self.assertEqual(main(['vimgolf', 'show', '+{}'.format(entry)]), 0)
         # The following ID is for 'Pascal's Triangle'
         # http://www.vimgolf.com/challenges/5ca2bc786b547e000c77fd52
-        challenge_id = '5ca2bc786b547e000c77fd52'
-        self.assertEqual(main(['vimgolf', 'show', challenge_id]), 0)
+        self.assertEqual(main(['vimgolf', 'show', '5ca2bc786b547e000c77fd52']), 0)
+        # A workaround was added to avoid VimGolf Issue #306. Test that 'show'
+        # works for 'Simple, Practical, and Common', a challenge that has the
+        # issue without the workaround.
+        # http://www.vimgolf.com/challenges/55b18bbea9c2c30d04000001
+        self.assertEqual(main(['vimgolf', 'show', '55b18bbea9c2c30d04000001']), 0)
+
 
     def test_ruby_client_version(self):
         response = http_request(GOLF_HOST)
