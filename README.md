@@ -54,6 +54,7 @@ $ python3 -m vimgolf
   vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge
   vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges
   vimgolf show CHALLENGE_ID     # show vimgolf.com challenge
+  vimgolf diff CHALLENGE_ID     # show diff of vimgolf.com challenge
   vimgolf version               # display the version number
 ```
 

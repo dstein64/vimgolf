@@ -340,6 +340,67 @@ def get_challenge_url(challenge_id):
     return urllib.parse.urljoin(GOLF_HOST, '/challenges/{}'.format(challenge_id))
 
 
+class VimRunner:
+    @staticmethod
+    def run(args):
+        try:
+            vim_path = find_executable(GOLF_VIM)
+            if not vim_path:
+                logger.error('unable to find {}'.format(GOLF_VIM))
+                write('Unable to find "{}"'.format(GOLF_VIM), color='red')
+                write('Please update your PATH to include the directory with "{}"'.format(GOLF_VIM), color='red')
+                return Status.FAILURE
+            vim_name = os.path.basename(os.path.realpath(vim_path))
+
+            # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'.
+            exe_exts = []
+            if sys.platform == 'win32':
+                exe_exts.extend(os.environ.get('PATHEXT', '.EXE').split(os.pathsep))
+            elif sys.platform == 'linux':
+                # Neovim Linux nightly releases are distributed as an AppImage (nvim.appimage).
+                exe_exts.append('.appimage')
+            base, ext = os.path.splitext(vim_name)
+            for exe_ext in exe_exts:
+                if ext.upper() == exe_ext.upper():
+                    vim_name = base
+                    break
+
+            # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
+            # Issue a warning as opposed to failing, since this may change.
+            if vim_name == 'nvim-qt' and sys.platform == 'win32':
+                write('vimgolf with nvim-qt on Windows may not function properly', color='red')
+                write('If there are issues, please try using a different version of vim', color='yellow')
+                if not confirm('Continue trying to play?'):
+                    logger.info('vim run aborted on win32 nvim-qt')
+                    return Status.FAILURE
+
+            # Configure args used by all vim invocations (for both playing and diffing)
+            # 'vim_path' is used instead of GOLF_VIM to handle 'vim.bat' on the PATH.
+            # subprocess.run would not launch vim.bat with GOLF_VIM == 'vim', but 'find_executable'
+            # will return the full path to vim.bat in that case.
+            vim_args = [vim_path]
+            # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
+            # Add special-case handling since nvim doesn't accept that option.
+            if vim_name != 'nvim':
+                vim_args.append('--nofork')
+            # For nvim-qt, options after '--' are passed to nvim.
+            if vim_name == 'nvim-qt':
+                vim_args.append('--')
+
+            vim_args.extend(args)
+            subprocess.run(vim_args, check=True)
+            # On Windows, vimgolf freezes when reading input after nvim's exit.
+            # For an unknown reason, shell'ing out an effective no-op works-around the issue
+            if vim_name == 'nvim' and sys.platform == 'win32':
+                os.system('')
+
+            return Status.SUCCESS
+        except Exception:
+            logger.exception('{} execution failed'.format(GOLF_VIM))
+            write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
+            return Status.FAILURE
+
+
 Challenge = namedtuple('Challenge', [
     'in_text',
     'out_text',
@@ -374,54 +435,6 @@ def upload_result(challenge_id, api_key, raw_keys):
 def play(challenge, workspace):
     logger.info('play(...)')
 
-    vim_path = find_executable(GOLF_VIM)
-    if not vim_path:
-        write('Unable to find "{}"'.format(GOLF_VIM), color='red')
-        write('Please update your PATH to include the directory with "{}"'.format(GOLF_VIM), color='red')
-        return Status.FAILURE
-    vim_name = os.path.basename(os.path.realpath(vim_path))
-
-    # Remove executable extension (.exe, .bat, .cmd, etc.) from 'vim_name'.
-    exe_exts = []
-    if sys.platform == 'win32':
-        exe_exts.extend(os.environ.get('PATHEXT', '.EXE').split(os.pathsep))
-    elif sys.platform == 'linux':
-        # Neovim Linux nightly releases are distributed as an AppImage (nvim.appimage).
-        exe_exts.append('.appimage')
-    base, ext = os.path.splitext(vim_name)
-    for exe_ext in exe_exts:
-        if ext.upper() == exe_ext.upper():
-            vim_name = base
-            break
-
-    # As of 2019/3/2, on Windows, nvim-qt doesn't support --nofork.
-    # Issue a warning as opposed to failing, since this may change.
-    if vim_name == 'nvim-qt' and sys.platform == 'win32':
-        write('vimgolf with nvim-qt on Windows may not function properly', color='red')
-        write('If there are issues, please try using a different version of vim', color='yellow')
-        if not confirm('Continue trying to play?'):
-            return Status.FAILURE
-
-    def vim(args, **run_kwargs):
-        # Configure args used by all vim invocations (for both playing and diffing)
-        # 'vim_path' is used instead of GOLF_VIM to handle 'vim.bat' on the PATH.
-        # subprocess.run would not launch vim.bat with GOLF_VIM == 'vim', but 'find_executable'
-        # will return the full path to vim.bat in that case.
-        vim_args = [vim_path]
-        # Add --nofork so gvim, mvim, and nvim-qt don't return immediately
-        # Add special-case handling since nvim doesn't accept that option.
-        if vim_name != 'nvim':
-            vim_args.append('--nofork')
-        # For nvim-qt, options after '--' are passed to nvim.
-        if vim_name == 'nvim-qt':
-            vim_args.append('--')
-        vim_args.extend(args)
-        subprocess.run(vim_args, **run_kwargs)
-        # On Windows, vimgolf freezes when reading input after nvim's exit.
-        # For an unknown reason, shell'ing out an effective no-op works-around the issue
-        if vim_name == 'nvim' and sys.platform == 'win32':
-            os.system('')
-
     infile = os.path.join(workspace, 'in')
     if challenge.in_extension:
         infile += challenge.in_extension
@@ -449,11 +462,7 @@ def play(challenge, workspace):
             '-W', logfile, # keylog file (overwrites existing)
             infile,
         ]
-        try:
-            vim(play_args, check=True)
-        except Exception:
-            logger.exception('{} execution failed'.format(GOLF_VIM))
-            write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
+        if VimRunner.run(play_args) == Status.FAILURE:
             return Status.FAILURE
 
         correct = filecmp.cmp(infile, outfile)
@@ -506,8 +515,10 @@ def play(challenge, workspace):
             if selection not in valid_codes:
                 write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
             elif selection == 'd':
-                diff_args = ['-d', '-n', infile, outfile]
-                vim(diff_args)
+                # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
+                diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
+                if VimRunner.run(diff_args) == Status.FAILURE:
+                    return Status.FAILURE
             elif selection == 'w':
                 upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
                 if upload_status == Status.SUCCESS:
@@ -758,6 +769,47 @@ def show(challenge_id):
     return Status.SUCCESS
 
 
+def diff(challenge_id):
+    challenge_id = expand_challenge_id(challenge_id)
+    logger.info('diff(%s)', challenge_id)
+    try:
+        if not validate_challenge_id(challenge_id):
+            show_challenge_id_error()
+            return Status.FAILURE
+
+        url = urllib.parse.urljoin(GOLF_HOST, '/challenges/{}.json'.format(challenge_id))
+        response = http_request(url)
+        challenge_spec = json.loads(response.body)
+        in_text = format_(challenge_spec['in']['data'])
+        out_text = format_(challenge_spec['out']['data'])
+        in_type = challenge_spec['in']['type']
+        out_type = challenge_spec['out']['type']
+        # Sanitize and add leading dot
+        in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
+        out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
+    except Exception:
+        logger.exception('challenge retrieval failed')
+        write('The challenge retrieval has failed', stream=sys.stderr, color='red')
+        write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
+        return Status.FAILURE
+    with tempfile.TemporaryDirectory() as workspace:
+        infile = os.path.join(workspace, 'in')
+        if in_extension:
+            infile += in_extension
+        outfile = os.path.join(workspace, 'out')
+        if out_extension:
+            outfile += out_extension
+        with open(infile, 'w') as f:
+            f.write(in_text)
+        with open(outfile, 'w') as f:
+            f.write(out_text)
+        # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
+        diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
+        if VimRunner.run(diff_args) == Status.FAILURE:
+            return Status.FAILURE
+    return Status.SUCCESS
+
+
 def config(api_key=None):
     logger.info('config(...)')
     if api_key is not None and not validate_api_key(api_key):
@@ -798,6 +850,7 @@ def main(argv=None):
         '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
         '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
         '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
+        '  vimgolf diff CHALLENGE_ID     # show diff of vimgolf.com challenge\n'
         '  vimgolf version               # display the version number'
     )
 
@@ -840,6 +893,13 @@ def main(argv=None):
             status = Status.FAILURE
         else:
             status = show(argv[2])
+    elif command == 'diff':
+        if len(argv) != 3:
+            usage = 'Usage: "vimgolf diff CHALLENGE_ID"'
+            write(usage, stream=sys.stderr, color='red')
+            status = Status.FAILURE
+        else:
+            status = diff(argv[2])
     elif command == 'config':
         if not len(argv) in (2, 3):
             usage = 'Usage: "vimgolf config [API_KEY]"'
