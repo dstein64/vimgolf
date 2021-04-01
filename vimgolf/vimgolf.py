@@ -370,7 +370,7 @@ class VimRunner:
             if vim_name == 'nvim-qt' and sys.platform == 'win32':
                 write('vimgolf with nvim-qt on Windows may not function properly', color='red')
                 write('If there are issues, please try using a different version of vim', color='yellow')
-                if not confirm('Continue trying to play?'):
+                if not confirm('Continue trying to launch?'):
                     logger.info('vim run aborted on win32 nvim-qt')
                     return Status.FAILURE
 
