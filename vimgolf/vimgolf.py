@@ -462,7 +462,7 @@ def play(challenge, workspace):
             '-W', logfile, # keylog file (overwrites existing)
             infile,
         ]
-        if VimRunner.run(play_args) == Status.FAILURE:
+        if VimRunner.run(play_args) != Status.SUCCESS:
             return Status.FAILURE
 
         correct = filecmp.cmp(infile, outfile)
@@ -517,7 +517,7 @@ def play(challenge, workspace):
             elif selection == 'd':
                 # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
                 diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
-                if VimRunner.run(diff_args) == Status.FAILURE:
+                if VimRunner.run(diff_args) != Status.SUCCESS:
                     return Status.FAILURE
             elif selection == 'w':
                 upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
@@ -805,7 +805,7 @@ def diff(challenge_id):
             f.write(out_text)
         # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
         diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
-        if VimRunner.run(diff_args) == Status.FAILURE:
+        if VimRunner.run(diff_args) != Status.SUCCESS:
             return Status.FAILURE
     return Status.SUCCESS
 
