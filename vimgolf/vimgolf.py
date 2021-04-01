@@ -276,6 +276,7 @@ def find_executable(executable):
 
 @contextlib.contextmanager
 def working_directory(directory):
+    """A context manager that temporarily changes the working directory."""
     existing = os.getcwd()
     os.chdir(directory)
     try:
