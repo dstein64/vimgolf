@@ -1,5 +1,6 @@
 from collections import namedtuple
 import concurrent.futures
+import contextlib
 import datetime
 from distutils.version import StrictVersion
 from enum import Enum
@@ -273,6 +274,16 @@ def find_executable(executable):
         return find_executable_unix(executable)
 
 
+@contextlib.contextmanager
+def working_directory(directory):
+    existing = os.getcwd()
+    os.chdir(directory)
+    try:
+        yield
+    finally:
+        os.chdir(existing)
+
+
 # ************************************************************
 # * Core
 # ************************************************************
@@ -432,112 +443,112 @@ def upload_result(challenge_id, api_key, raw_keys):
     return status
 
 
-def play(challenge, workspace):
+def play(challenge):
     logger.info('play(...)')
+    with tempfile.TemporaryDirectory() as workspace, working_directory(workspace):
+        infile = 'in'
+        if challenge.in_extension:
+            infile += challenge.in_extension
+        outfile = 'out'
+        if challenge.out_extension:
+            outfile += challenge.out_extension
+        logfile = 'log'
+        with open(outfile, 'w') as f:
+            f.write(challenge.out_text)
 
-    infile = os.path.join(workspace, 'in')
-    if challenge.in_extension:
-        infile += challenge.in_extension
-    outfile = os.path.join(workspace, 'out')
-    if challenge.out_extension:
-        outfile += challenge.out_extension
-    logfile = os.path.join(workspace, 'log')
-    with open(outfile, 'w') as f:
-        f.write(challenge.out_text)
-
-    write('Launching vimgolf session', color='yellow')
-    while True:
-        with open(infile, 'w') as f:
-            f.write(challenge.in_text)
-
-        vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
-        play_args = [
-            '-Z',          # restricted mode, utilities not allowed
-            '-n',          # no swap file, memory only editing
-            '--noplugin',  # no plugins
-            '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-            '+0',          # start on line 0
-            '-u', vimrc,   # vimgolf .vimrc
-            '-U', 'NONE',  # don't load .gvimrc
-            '-W', logfile, # keylog file (overwrites existing)
-            infile,
-        ]
-        if VimRunner.run(play_args) != Status.SUCCESS:
-            return Status.FAILURE
-
-        correct = filecmp.cmp(infile, outfile)
-        logger.info('correct: %s', str(correct).lower())
-        with open(logfile, 'rb') as _f:
-            # raw keypress representation saved by vim's -w
-            raw_keys = _f.read()
-
-        # list of parsed keycode byte strings
-        keycodes = parse_keycodes(raw_keys)
-        keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
-
-        # list of human-readable key strings
-        keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
-        logger.info('keys: %s', ''.join(keycode_reprs))
-
-        score = len(keycodes)
-        logger.info('score: %d', score)
-
-        write('Here are your keystrokes:', color='green')
-        for keycode_repr in keycode_reprs:
-            color = 'magenta' if len(keycode_repr) > 1 else None
-            write(keycode_repr, color=color, end=None)
-        write('')
-
-        if correct:
-            write('Success! Your output matches.', color='green')
-            write('Your score:', color='green')
-        else:
-            write('Uh oh, looks like your entry does not match the desired output.', color='red')
-            write('Your score for this failed attempt:', color='red')
-        write(score)
-
-        upload_eligible = challenge.id and challenge.compliant and challenge.api_key
-
+        write('Launching vimgolf session', color='yellow')
         while True:
-            # Generate the menu items inside the loop since it can change across iterations
-            # (e.g., upload option can be removed)
-            menu = []
-            if not correct:
-                menu.append(('d', 'Show diff'))
-            if upload_eligible and correct:
-                menu.append(('w', 'Upload result'))
-            menu.append(('r', 'Retry the current challenge'))
-            menu.append(('q', 'Quit vimgolf'))
-            valid_codes = [x[0] for x in menu]
-            for option in menu:
-                write('[{}] {}'.format(*option), color='yellow')
-            selection = input_loop('Choice> ')
-            if selection not in valid_codes:
-                write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
-            elif selection == 'd':
-                # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
-                diff_args = ['-n', outfile, '-c', 'vertical diffsplit {}'.format(infile)]
-                if VimRunner.run(diff_args) != Status.SUCCESS:
-                    return Status.FAILURE
-            elif selection == 'w':
-                upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
-                if upload_status == Status.SUCCESS:
-                    write('Uploaded entry!', color='green')
-                    leaderboard_url = get_challenge_url(challenge.id)
-                    write('View the leaderboard: {}'.format(leaderboard_url), color='green')
-                    upload_eligible = False
-                else:
-                    write('The entry upload has failed', stream=sys.stderr, color='red')
-                    message = 'Please check your API key on vimgolf.com'
-                    write(message, stream=sys.stderr, color='red')
-            else:
-                break
-        if selection == 'q':
-            break
-        write('Retrying vimgolf challenge', color='yellow')
+            with open(infile, 'w') as f:
+                f.write(challenge.in_text)
 
-    write('Thanks for playing!', color='green')
-    return Status.SUCCESS
+            vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
+            play_args = [
+                '-Z',          # restricted mode, utilities not allowed
+                '-n',          # no swap file, memory only editing
+                '--noplugin',  # no plugins
+                '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
+                '+0',          # start on line 0
+                '-u', vimrc,   # vimgolf .vimrc
+                '-U', 'NONE',  # don't load .gvimrc
+                '-W', logfile, # keylog file (overwrites existing)
+                infile,
+            ]
+            if VimRunner.run(play_args) != Status.SUCCESS:
+                return Status.FAILURE
+
+            correct = filecmp.cmp(infile, outfile)
+            logger.info('correct: %s', str(correct).lower())
+            with open(logfile, 'rb') as _f:
+                # raw keypress representation saved by vim's -w
+                raw_keys = _f.read()
+
+            # list of parsed keycode byte strings
+            keycodes = parse_keycodes(raw_keys)
+            keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
+
+            # list of human-readable key strings
+            keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
+            logger.info('keys: %s', ''.join(keycode_reprs))
+
+            score = len(keycodes)
+            logger.info('score: %d', score)
+
+            write('Here are your keystrokes:', color='green')
+            for keycode_repr in keycode_reprs:
+                color = 'magenta' if len(keycode_repr) > 1 else None
+                write(keycode_repr, color=color, end=None)
+            write('')
+
+            if correct:
+                write('Success! Your output matches.', color='green')
+                write('Your score:', color='green')
+            else:
+                write('Uh oh, looks like your entry does not match the desired output.', color='red')
+                write('Your score for this failed attempt:', color='red')
+            write(score)
+
+            upload_eligible = challenge.id and challenge.compliant and challenge.api_key
+
+            while True:
+                # Generate the menu items inside the loop since it can change across iterations
+                # (e.g., upload option can be removed)
+                menu = []
+                if not correct:
+                    menu.append(('d', 'Show diff'))
+                if upload_eligible and correct:
+                    menu.append(('w', 'Upload result'))
+                menu.append(('r', 'Retry the current challenge'))
+                menu.append(('q', 'Quit vimgolf'))
+                valid_codes = [x[0] for x in menu]
+                for option in menu:
+                    write('[{}] {}'.format(*option), color='yellow')
+                selection = input_loop('Choice> ')
+                if selection not in valid_codes:
+                    write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
+                elif selection == 'd':
+                    # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
+                    diff_args = ['-n', outfile, '-c', 'vertical diffsplit {}'.format(infile)]
+                    if VimRunner.run(diff_args) != Status.SUCCESS:
+                        return Status.FAILURE
+                elif selection == 'w':
+                    upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
+                    if upload_status == Status.SUCCESS:
+                        write('Uploaded entry!', color='green')
+                        leaderboard_url = get_challenge_url(challenge.id)
+                        write('View the leaderboard: {}'.format(leaderboard_url), color='green')
+                        upload_eligible = False
+                    else:
+                        write('The entry upload has failed', stream=sys.stderr, color='red')
+                        message = 'Please check your API key on vimgolf.com'
+                        write(message, stream=sys.stderr, color='red')
+                else:
+                    break
+            if selection == 'q':
+                break
+            write('Retrying vimgolf challenge', color='yellow')
+
+        write('Thanks for playing!', color='green')
+        return Status.SUCCESS
 
 
 def local(infile, outfile):
@@ -556,8 +567,7 @@ def local(infile, outfile):
         id=None,
         compliant=None,
         api_key=None)
-    with tempfile.TemporaryDirectory() as d:
-        status = play(challenge, d)
+    status = play(challenge)
     return status
 
 
@@ -617,8 +627,7 @@ def put(challenge_id):
         id=challenge_id,
         compliant=compliant,
         api_key=api_key)
-    with tempfile.TemporaryDirectory() as d:
-        status = play(challenge, d)
+    status = play(challenge)
 
     return status
 
@@ -792,11 +801,11 @@ def diff(challenge_id):
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
         return Status.FAILURE
-    with tempfile.TemporaryDirectory() as workspace:
-        infile = os.path.join(workspace, 'in')
+    with tempfile.TemporaryDirectory() as workspace, working_directory(workspace):
+        infile = 'in'
         if in_extension:
             infile += in_extension
-        outfile = os.path.join(workspace, 'out')
+        outfile = 'out'
         if out_extension:
             outfile += out_extension
         with open(infile, 'w') as f:
