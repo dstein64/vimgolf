@@ -516,7 +516,7 @@ def play(challenge, workspace):
                 write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
             elif selection == 'd':
                 # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
-                diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
+                diff_args = ['-n', outfile, '-c', 'vertical diffsplit {}'.format(infile)]
                 if VimRunner.run(diff_args) != Status.SUCCESS:
                     return Status.FAILURE
             elif selection == 'w':
@@ -804,7 +804,7 @@ def diff(challenge_id):
         with open(outfile, 'w') as f:
             f.write(out_text)
         # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
-        diff_args = ['-n', infile, '-c', 'vertical diffsplit {}'.format(outfile)]
+        diff_args = ['-n', outfile, '-c', 'vertical diffsplit {}'.format(infile)]
         if VimRunner.run(diff_args) != Status.SUCCESS:
             return Status.FAILURE
     return Status.SUCCESS
