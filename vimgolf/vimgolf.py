@@ -850,7 +850,7 @@ def main(argv=None):
         '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
         '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
         '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
-        '  vimgolf diff CHALLENGE_ID     # show diff of vimgolf.com challenge\n'
+        '  vimgolf diff CHALLENGE_ID     # show diff for vimgolf.com challenge\n'
         '  vimgolf version               # display the version number'
     )
 
