@@ -7,7 +7,7 @@ from enum import Enum
 import filecmp
 import glob
 import json
-import logging.handlers
+import logging
 import os
 from pathlib import Path
 import re
