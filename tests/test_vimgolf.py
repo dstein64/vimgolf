@@ -72,7 +72,6 @@ class TestVimgolf(unittest.TestCase):
         # GitHub Actions for the following challenge.
         self.assertEqual(main(['vimgolf', 'show', '4d1c7ee635b40650b8000203']), 0)
 
-
     def test_ruby_client_version(self):
         response = http_request(GOLF_HOST)
         nodes = parse_html(response.body)
