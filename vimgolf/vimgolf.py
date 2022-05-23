@@ -182,6 +182,17 @@ def write(string, end='\n', stream=None, color=None):
         stream = sys.stdout
     if color and hasattr(stream, 'isatty') and stream.isatty():
         string = color_lookup[color] + string + end_color
+    if stream.encoding is not None:
+        # Encode string to be compatible with the output stream. This was added
+        # to address the following exception observed on Windows through GitHub
+        # Actions for the 4d1c7ee635b40650b8000203 VimGolf challenge:
+        #  UnicodeEncodeError: 'charmap' codec can't encode character '\u0331'
+        #  in position 11: character maps to <undefined>
+        # (the stream encoding was 'cp1252')
+        # WARN: This could result in replacement characters (e.g., question
+        # mark or the generic replacement character used for mojibake) for
+        # characters not supported by the stream's encoding.
+        string = string.encode(stream.encoding, errors='replace').decode(stream.encoding)
     stream.write(string)
     if end is not None:
         stream.write(str(end))
