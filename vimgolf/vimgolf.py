@@ -418,9 +418,10 @@ class VimRunner:
                 os.system('')
 
             return Status.SUCCESS
-        except Exception:
+        except Exception as e:
             logger.exception('{} execution failed'.format(GOLF_VIM))
             write('The execution of {} has failed'.format(GOLF_VIM), stream=sys.stderr, color='red')
+            write(str(e), stream=sys.stderr, color='magenta')
             return Status.FAILURE
 
 
@@ -625,10 +626,11 @@ def put(challenge_id):
         # Sanitize and add leading dot
         in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
         out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
-    except Exception:
+    except Exception as e:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
+        write(str(e), stream=sys.stderr, color='magenta')
         return Status.FAILURE
 
     challenge = Challenge(
@@ -669,9 +671,10 @@ def list_(page=None, limit=LISTING_LIMIT):
                     break
             listing = Listing(id=id_, name=name, n_entries=n_entries)
             listings.append(listing)
-    except Exception:
+    except Exception as e:
         logger.exception('challenge retrieval failed')
         write('The challenge list retrieval has failed', stream=sys.stderr, color='red')
+        write(str(e), stream=sys.stderr, color='magenta')
         return Status.FAILURE
 
     for idx, listing in enumerate(listings):
@@ -781,10 +784,11 @@ def show(challenge_id):
         write('End File', color='green')
         write(showing.end_file, end=None)
         write(separator)
-    except Exception:
+    except Exception as e:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
+        write(str(e), stream=sys.stderr, color='magenta')
         return Status.FAILURE
 
     return Status.SUCCESS
@@ -808,10 +812,11 @@ def diff(challenge_id):
         # Sanitize and add leading dot
         in_extension = '.{}'.format(re.sub(r'[^\w-]', '_', in_type))
         out_extension = '.{}'.format(re.sub(r'[^\w-]', '_', out_type))
-    except Exception:
+    except Exception as e:
         logger.exception('challenge retrieval failed')
         write('The challenge retrieval has failed', stream=sys.stderr, color='red')
         write('Please check the challenge ID on vimgolf.com', stream=sys.stderr, color='red')
+        write(str(e), stream=sys.stderr, color='magenta')
         return Status.FAILURE
     with tempfile.TemporaryDirectory() as workspace, working_directory(workspace):
         infile = 'in'
