@@ -63,7 +63,9 @@ last invocation of `vimgolf list`. For example, a `CHALLENGE_ID` of `+6` would c
 sixth challenge presented in the most recent call to `vimgolf list`.
 
 <details open><summary><h2>Demo</h2></summary>
+
 <img src="https://github.com/dstein64/media/blob/main/vimgolf/screencast.gif?raw=true" width="800"/>
+
 </details>
 
 License
