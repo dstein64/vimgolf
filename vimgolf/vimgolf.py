@@ -497,7 +497,7 @@ def play(challenge, results=None):
             init_feedkeys = ''.join(init_feedkeys)
         except Exception:
             logger.exception('invalid init keys')
-            write(f'Invalid keys: {challenge.init_keys}', color='red')
+            write('Invalid keys: {}'.format(challenge.init_keys), color='red')
             return Status.FAILURE
 
         write('Launching vimgolf session', color='yellow')
@@ -515,7 +515,7 @@ def play(challenge, results=None):
                 '-u', vimrc,   # vimgolf .vimrc
                 '-U', 'NONE',  # don't load .gvimrc
                 '-W', logfile, # keylog file (overwrites existing)
-                f'+call feedkeys("{init_feedkeys}", "t")',  # initial keys
+                '+call feedkeys("{}", "t")'.format(init_feedkeys),  # initial keys
                 infile,
             ]
             if VimRunner.run(play_args) != Status.SUCCESS:
