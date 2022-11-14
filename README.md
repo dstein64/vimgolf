@@ -68,8 +68,8 @@ For the `local` command, `IN` and `OUT` are paths to files.
 For the `local` and `put` commands, the optional `KEYS` specifies a set of keys to enter when
 launching the challenge. For example, `ihello world<esc>` would enter insert mode, type "hello
 world", and then switch back to normal mode. The character "<" is assumed to start a special
-sequence (e.g., "<esc>") if that would be possible given the characters that follow. The input
-string should use "<lt>" to disambiguate.
+sequence (e.g., "\<esc>") if that would be possible given the characters that follow. The input
+string should use "\<lt>" to disambiguate.
 
 <details open><summary><h2>Demo</h2></summary>
 
