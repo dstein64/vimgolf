@@ -29,6 +29,7 @@ from vimgolf.keys import (
     get_keycode_repr,
     IGNORED_KEYSTROKES,
     parse_keycodes,
+    tokenize_keycode_reprs,
 )
 
 
@@ -432,7 +433,8 @@ Challenge = namedtuple('Challenge', [
     'out_extension',
     'id',
     'compliant',
-    'api_key'
+    'api_key',
+    'init_keys',
 ])
 
 
@@ -456,7 +458,12 @@ def upload_result(challenge_id, api_key, raw_keys):
     return status
 
 
-def play(challenge):
+Result = namedtuple('Result', 'correct keys score')
+
+
+def play(challenge, results=None):
+    if results is None:
+        results = []
     logger.info('play(...)')
     with tempfile.TemporaryDirectory() as workspace, working_directory(workspace):
         infile = 'in'
@@ -468,6 +475,30 @@ def play(challenge):
         logfile = 'log'
         with open(outfile, 'w') as f:
             f.write(challenge.out_text)
+
+        try:
+            # If there were init keys specified, we need to convert them to a
+            # form suitable for feedkeys(). We can't use Vim's -s option since
+            # it takes escape codes, not key codes. See Vim #4041 and TODO.txt
+            # ("Bug: script written with "-W scriptout" contains Key codes,
+            # while the script read with "-s scriptin" expects escape codes").
+            # The conversion is conducted here so that we can fail fast on
+            # error (prior to playing) and to avoid repeated computation.
+            keycode_reprs = tokenize_keycode_reprs(challenge.init_keys)
+            init_feedkeys = []
+            for item in keycode_reprs:
+                if item == '\\':
+                    item = '\\\\'  # Replace '\' with '\\'
+                elif item == '"':
+                    item = '\\"'   # Replace '"' with '\"'
+                elif item.startswith('<') and item.endswith('>'):
+                    item = '\\' + item  # Escape special keys ("<left>" -> "\<left>")
+                init_feedkeys.append(item)
+            init_feedkeys = ''.join(init_feedkeys)
+        except Exception:
+            logger.exception('invalid init keys')
+            write(f'Invalid keys: {challenge.init_keys}', color='red')
+            return Status.FAILURE
 
         write('Launching vimgolf session', color='yellow')
         while True:
@@ -484,6 +515,7 @@ def play(challenge):
                 '-u', vimrc,   # vimgolf .vimrc
                 '-U', 'NONE',  # don't load .gvimrc
                 '-W', logfile, # keylog file (overwrites existing)
+                f'+call feedkeys("{init_feedkeys}", "t")',  # initial keys
                 infile,
             ]
             if VimRunner.run(play_args) != Status.SUCCESS:
@@ -505,6 +537,9 @@ def play(challenge):
 
             score = len(keycodes)
             logger.info('score: %d', score)
+
+            result = Result(correct=correct, keys=''.join(keycode_reprs), score=score)
+            results.append(result)
 
             write('Here are your keystrokes:', color='green')
             for keycode_repr in keycode_reprs:
@@ -564,7 +599,7 @@ def play(challenge):
         return Status.SUCCESS
 
 
-def local(infile, outfile):
+def local(infile, outfile, init_keys=''):
     logger.info('local(%s, %s)', infile, outfile)
     with open(infile, 'r') as f:
         in_text = format_(f.read())
@@ -579,12 +614,14 @@ def local(infile, outfile):
         out_extension=out_extension,
         id=None,
         compliant=None,
-        api_key=None)
+        api_key=None,
+        init_keys=init_keys,
+    )
     status = play(challenge)
     return status
 
 
-def put(challenge_id):
+def put(challenge_id, init_keys=''):
     challenge_id = expand_challenge_id(challenge_id)
     logger.info('put(%s)', challenge_id)
     if not validate_challenge_id(challenge_id):
@@ -640,7 +677,9 @@ def put(challenge_id):
         out_extension=out_extension,
         id=challenge_id,
         compliant=compliant,
-        api_key=api_key)
+        api_key=api_key,
+        init_keys=init_keys,
+    )
     status = play(challenge)
 
     return status
@@ -872,11 +911,11 @@ def main(argv=None):
         'Commands:\n'
         '  vimgolf [help]                # display this help and exit\n'
         '  vimgolf config [API_KEY]      # configure your vimgolf.com credentials\n'
-        '  vimgolf local INFILE OUTFILE  # launch local challenge\n'
-        '  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge\n'
+        '  vimgolf local IN OUT [KEYS]   # launch local challenge\n'
+        '  vimgolf put CHALLENGE [KEYS]  # launch vimgolf.com challenge\n'
         '  vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges\n'
-        '  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge\n'
-        '  vimgolf diff CHALLENGE_ID     # show diff for vimgolf.com challenge\n'
+        '  vimgolf show CHALLENGE        # show vimgolf.com challenge\n'
+        '  vimgolf diff CHALLENGE        # show diff for vimgolf.com challenge\n'
         '  vimgolf version               # display the version number'
     )
 
@@ -884,19 +923,21 @@ def main(argv=None):
         write(help_message)
         status = Status.SUCCESS
     elif command == 'local':
-        if len(argv) != 4:
-            usage = 'Usage: "vimgolf local INFILE OUTFILE"'
+        if not len(argv) in (4, 5):
+            usage = 'Usage: "vimgolf local IN OUT [KEYS]"'
             write(usage, stream=sys.stderr, color='red')
             status = Status.FAILURE
         else:
-            status = local(argv[2], argv[3])
+            init_keys = '' if len(argv) == 4 else argv[4]
+            status = local(argv[2], argv[3], init_keys)
     elif command == 'put':
-        if len(argv) != 3:
-            usage = 'Usage: "vimgolf put CHALLENGE_ID"'
+        if not len(argv) in (3, 4):
+            usage = 'Usage: "vimgolf put CHALLENGE [KEYS]"'
             write(usage, stream=sys.stderr, color='red')
             status = Status.FAILURE
         else:
-            status = put(argv[2])
+            init_keys = '' if len(argv) == 3 else argv[3]
+            status = put(argv[2], init_keys=init_keys)
     elif command == 'list':
         if not len(argv) in (2, 3):
             usage = 'Usage: "vimgolf list [PAGE]"'
@@ -914,14 +955,14 @@ def main(argv=None):
             status = list_(**kwargs)
     elif command == 'show':
         if len(argv) != 3:
-            usage = 'Usage: "vimgolf show CHALLENGE_ID"'
+            usage = 'Usage: "vimgolf show CHALLENGE"'
             write(usage, stream=sys.stderr, color='red')
             status = Status.FAILURE
         else:
             status = show(argv[2])
     elif command == 'diff':
         if len(argv) != 3:
-            usage = 'Usage: "vimgolf diff CHALLENGE_ID"'
+            usage = 'Usage: "vimgolf diff CHALLENGE"'
             write(usage, stream=sys.stderr, color='red')
             status = Status.FAILURE
         else:

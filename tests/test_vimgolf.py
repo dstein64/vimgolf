@@ -1,5 +1,7 @@
 from contextlib import redirect_stdout
 import io
+from collections import namedtuple
+import sys
 import unittest
 
 from vimgolf.html import (
@@ -8,13 +10,18 @@ from vimgolf.html import (
     get_text,
     parse_html,
 )
+from vimgolf.keys import tokenize_keycode_reprs
 from vimgolf.vimgolf import (
+    Challenge,
+    format_,
     get_api_key,
     GOLF_HOST,
     http_request,
     main,
+    play,
     RUBY_CLIENT_VERSION_COMPLIANCE,
     set_api_key,
+    Status,
 )
 
 # XXX: The current tests are limited, only checking that some commands can run
@@ -80,6 +87,45 @@ class TestVimgolf(unittest.TestCase):
         version_a_element = get_elements_by_tagname(version_b_element.children, 'a')[0]
         version = get_text(version_a_element.children)
         self.assertEqual(version, RUBY_CLIENT_VERSION_COMPLIANCE)
+
+    def test_play(self):
+        PlaySpec = namedtuple('PlaySpec', 'in_text out_text init_keys correct')
+        play_specs = [
+            PlaySpec('hello world', 'world', 'dWZZ', True),
+            PlaySpec('hello world', 'world', 'dWZQ', False),
+            PlaySpec('', 'hello world', 'ihello world<esc>ZZ', True),
+            PlaySpec('', 'hello world', 'ihello world<ESC>ZZ', True),
+            PlaySpec('', 'hello\nworld', 'ihello<cr>world<esc>ZZ', True),
+            PlaySpec('text', 'hello\nworld', 'ddihello<cr>world<esc>ZZ', True),
+            PlaySpec('hello world', '\thello world', '>>ZZ', True),
+            PlaySpec('\thello world', 'hello world', '<<ZZ', True),
+            PlaySpec('\thello world', 'hello world', '<lt><ZZ', True),
+            PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><bs><esc>ZZ', True),
+            PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
+            PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
+            PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
+            PlaySpec('', '"\\', 'i"\\<esc>ZZ', True),
+        ]
+        for play_spec in play_specs:
+            challenge = Challenge(
+                in_text=format_(play_spec.in_text),
+                out_text=format_(play_spec.out_text),
+                in_extension='.txt',
+                out_extension='.txt',
+                id=None,
+                compliant=None,
+                api_key=None,
+                init_keys=play_spec.init_keys,
+            )
+            stdin = sys.stdin
+            sys.stdin = io.StringIO('q\n')  # Choice> q (for quitting vimgolf)
+            results = []
+            status = play(challenge, results)
+            sys.stdin = stdin
+            self.assertEqual(status, Status.SUCCESS)
+            self.assertEqual(results[-1].correct, play_spec.correct)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[-1].score, len(tokenize_keycode_reprs(play_spec.init_keys)))
 
 
 if __name__ == '__main__':

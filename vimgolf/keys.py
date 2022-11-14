@@ -1,14 +1,49 @@
 """Maps keys recorded by vim to a printable representation"""
 
+# ************************************************************
+# * Utils
+# ************************************************************
+
 def to_bytes(x):
     """Convert an integer to bytes."""
     return x.to_bytes(2, 'big')
 
 
-def to_int(x):
-    """Convert bytes to an integer."""
-    return int(x.hex(), 16)
+class Trie:
+    def __init__(self):
+        # Node format: [<LOOKUP_TABLE>, <IS_MEMBER>]
+        self.root = [{}, False]
 
+    def add(self, item):
+        # empty elements ('') are not handled (e.g., in match()), since it's not relevant here.
+        assert item != ''
+        node = self.root
+        for c in item:
+            if c not in node[0]:
+                node[0][c] = [{}, False]
+            node = node[0][c]
+        node[1] = True
+
+    def match(self, item, start=0, key=lambda x: x):
+        """
+        Returns the minimum length of a trie item for which there is a leading match (at the specified
+        start), or None. For example, match('hello world!!!', start=6) would return 5 if there is a "world"
+        element in the trie (assuming "world" is the shortest match).
+        """
+        node = self.root
+        for idx in range(start, len(item)):
+            c = key(item[idx])
+            if c not in node[0]:
+                return None
+            node = node[0][c]
+            if node[1]:
+                return idx - start + 1
+        return None
+
+
+# ************************************************************
+# * Core
+# ************************************************************
 
 # Vim records key presses using 1) a single byte or 2) a 0x80 byte
 # followed by two bytes. Parse the single-bytes and double-bytes.
@@ -216,3 +251,37 @@ def get_keycode_repr(keycode):
         key = ''.join('\\x{:02x}'.format(x) for x in keycode)
         key = '[' + key + ']'
     return key
+
+
+# Given a string of keycode representations, return a list of the comprising elements.
+# E.g., tokenize_keycode_reprs('i<left>asd<esc>') == ['i', '<left>', 'a', 's', 'd', '<esc>']
+# WARN: The character "<" is assumed to start a special sequence (e.g., "<esc>") if that
+# would be possible given the characters that follow. The input string should use "<lt>"
+# to disambiguate.
+def tokenize_keycode_reprs(s):
+    # WARN: This function is only called once per program run. Otherwise, the trie creation
+    # should be factored out so that it's not repeated.
+    special = set()
+    for item in _KEYCODE_REPR_LOOKUP.values():
+        if item.startswith('<') and item.endswith('>'):
+            special.add(item.lower())
+    # Add the keycodes listed in ":help keycodes" that aren't added yet.
+    special.update([
+        '<nul>', '<return>', '<enter>', '<esc>', '<space>', '<lt>',
+        '<bslash>', '<bar>', '<csi>', '<xcsi>', '<eol>',
+    ])
+    trie = Trie()
+    for item in special:
+        trie.add(item)
+    result = []
+    idx = 0
+    while idx < len(s):
+        if s[idx] == '<':
+            match = trie.match(s, start=idx, key=lambda x: x.lower())
+            if match is not None:
+                result.append(s[idx:idx + match])
+                idx += match
+                continue
+        result.append(s[idx])
+        idx += 1
+    return result

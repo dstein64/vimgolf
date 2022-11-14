@@ -6,7 +6,8 @@ vimgolf
 This project contains a [vimgolf](https://www.vimgolf.com/) client written in Python.
 
 The user interface is similar to the [official vimgolf client](https://github.com/igrigorik/vimgolf),
-with a few additions inspired by [vimgolf-finder](https://github.com/kciter/vimgolf-finder).
+with a few additions inspired by [vimgolf-finder](https://github.com/kciter/vimgolf-finder), and an
+optional way to specify keys to type when launching a challenge.
 
 Installation
 ------------
@@ -50,17 +51,25 @@ $ python3 -m vimgolf
 ```text
   vimgolf [help]                # display this help and exit
   vimgolf config [API_KEY]      # configure your VimGolf credentials
-  vimgolf local INFILE OUTFILE  # launch local challenge
-  vimgolf put CHALLENGE_ID      # launch vimgolf.com challenge
+  vimgolf local IN OUT [KEYS]   # launch local challenge
+  vimgolf put CHALLENGE [KEYS]  # launch vimgolf.com challenge
   vimgolf list [PAGE][:LIMIT]   # list vimgolf.com challenges
-  vimgolf show CHALLENGE_ID     # show vimgolf.com challenge
-  vimgolf diff CHALLENGE_ID     # show diff for vimgolf.com challenge
+  vimgolf show CHALLENGE        # show vimgolf.com challenge
+  vimgolf diff CHALLENGE        # show diff for vimgolf.com challenge
   vimgolf version               # display the version number
 ```
 
-`CHALLENGE_ID` can be a 24-character ID from vimgolf.com, or a plus-prefixed ID corresponding to the
-last invocation of `vimgolf list`. For example, a `CHALLENGE_ID` of `+6` would correspond to the
-sixth challenge presented in the most recent call to `vimgolf list`.
+`CHALLENGE` can be a 24-character ID from vimgolf.com, or a plus-prefixed ID corresponding to the
+last invocation of `vimgolf list`. For example, a `CHALLENGE` of `+6` would correspond to the sixth
+challenge presented in the most recent call to `vimgolf list`.
+
+For the `local` command, `IN` and `OUT` are paths to files.
+
+For the `local` and `put` commands, the optional `KEYS` specifies a set of keys to enter when
+launching the challenge. For example, `ihello world<esc>` would enter insert mode, type "hello
+world", and then switch back to normal mode. The character "<" is assumed to start a special
+sequence (e.g., "<esc>") if that would be possible given the characters that follow. The input
+string should use "<lt>" to disambiguate.
 
 <details open><summary><h2>Demo</h2></summary>
 
