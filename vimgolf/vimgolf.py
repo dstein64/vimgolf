@@ -77,7 +77,7 @@ USER_AGENT = 'vimgolf'
 
 RUBY_CLIENT_VERSION_COMPLIANCE = '0.5.0'
 
-EXPANSION_PREFIX='+'
+EXPANSION_PREFIX = '+'
 
 USER_HOME = os.path.expanduser('~')
 
