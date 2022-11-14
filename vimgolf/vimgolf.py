@@ -489,7 +489,7 @@ def play(challenge):
             if VimRunner.run(play_args) != Status.SUCCESS:
                 return Status.FAILURE
 
-            correct = filecmp.cmp(infile, outfile)
+            correct = filecmp.cmp(infile, outfile, shallow=False)
             logger.info('correct: %s', str(correct).lower())
             with open(logfile, 'rb') as _f:
                 # raw keypress representation saved by vim's -w
