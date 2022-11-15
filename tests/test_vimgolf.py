@@ -1,6 +1,7 @@
 from contextlib import redirect_stdout
 import io
 from collections import namedtuple
+import os
 import sys
 import unittest
 
@@ -118,7 +119,7 @@ class TestVimgolf(unittest.TestCase):
                 init_keys=play_spec.init_keys,
             )
             stdin = sys.stdin
-            sys.stdin = io.StringIO('q\n')  # Choice> q (for quitting vimgolf)
+            sys.stdin = io.StringIO('q' + os.linesep)  # Choice> q (for quitting vimgolf)
             results = []
             status = play(challenge, results)
             sys.stdin = stdin
