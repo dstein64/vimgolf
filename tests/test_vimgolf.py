@@ -92,32 +92,33 @@ class TestVimgolf(unittest.TestCase):
     def test_play(self):
         PlaySpec = namedtuple('PlaySpec', 'in_text out_text init_keys correct')
         play_specs = [
-            PlaySpec('hello world', 'world', 'dWZZ', True),
-            PlaySpec('hello world', 'world', 'dWZQ', False),
-            PlaySpec('', 'hello world', 'ihello world<esc>ZZ', True),
-            PlaySpec('', 'hello world', 'ihello world<ESC>ZZ', True),
-            PlaySpec('', 'hello\nworld', 'ihello<cr>world<esc>ZZ', True),
-            PlaySpec('text', 'hello\nworld', 'ddihello<cr>world<esc>ZZ', True),
-            PlaySpec('hello world', '\thello world', '>>ZZ', True),
-            PlaySpec('\thello world', 'hello world', '<<ZZ', True),
-            PlaySpec('\thello world', 'hello world', '<lt><ZZ', True),
-            PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><bs><esc>ZZ', True),
-            PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
-            PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
-            PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
+            # PlaySpec('hello world', 'world', 'dWZZ', True),
+            # PlaySpec('hello world', 'world', 'dWZQ', False),
+            # PlaySpec('', 'hello world', 'ihello world<esc>ZZ', True),
+            # PlaySpec('', 'hello world', 'ihello world<ESC>ZZ', True),
+            # PlaySpec('', 'hello\nworld', 'ihello<cr>world<esc>ZZ', True),
+            # PlaySpec('text', 'hello\nworld', 'ddihello<cr>world<esc>ZZ', True),
+            # PlaySpec('hello world', '\thello world', '>>ZZ', True),
+            # PlaySpec('\thello world', 'hello world', '<<ZZ', True),
+            # PlaySpec('\thello world', 'hello world', '<lt><ZZ', True),
+            # PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><bs><esc>ZZ', True),
+            # PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
+            # PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
+            # PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
+            PlaySpec('', 'a"b\\c', r'ia"b\c<esc>ZZ', True)
         ]
-        if sys.platform != 'win32' or 'GITHUB_ACTIONS' not in os.environ:
-            # The following test hangs under GitHub Actions on Windows (but not on a direct test on
-            # a Windows machine). The issue does not occur without the backslash entry in init_keys.
-            # A test above also uses backslash without issue. The problem may be related to using
-            # a backslash prior to <esc>. Perhaps this relates to the note under ":help dos-backslash":
-            # "But when a backslash occurs before a special character (space, comma, backslash, etc.),
-            # Vim removes the backslash."
-            play_specs.append(PlaySpec('', '"\\', 'i"\\<esc>ZZ', True))
-            # The following test fails on Windows (only under GitHub Actions), without hanging. The
-            # backslash does not show up as executed keys.
-            # > Here are your keystrokes: ia"bc<Esc>ZZ
-            play_specs.append(PlaySpec('', 'a"b\\c', 'ia"b\\c<esc>ZZ', True))
+        # if sys.platform != 'win32' or 'GITHUB_ACTIONS' not in os.environ:
+        #     # The following test hangs under GitHub Actions on Windows (but not on a direct test on
+        #     # a Windows machine). The issue does not occur without the backslash entry in init_keys.
+        #     # A test above also uses backslash without issue. The problem may be related to using
+        #     # a backslash prior to <esc>. Perhaps this relates to the note under ":help dos-backslash":
+        #     # "But when a backslash occurs before a special character (space, comma, backslash, etc.),
+        #     # Vim removes the backslash."
+        #     play_specs.append(PlaySpec('', '"\\', 'i"\\<esc>ZZ', True))
+        #     # The following test fails on Windows (only under GitHub Actions), without hanging. The
+        #     # backslash does not show up as executed keys.
+        #     # > Here are your keystrokes: ia"bc<Esc>ZZ
+        #     play_specs.append(PlaySpec('', 'a"b\\c', 'ia"b\\c<esc>ZZ', True))
 
         for play_spec in play_specs:
             challenge = Challenge(
