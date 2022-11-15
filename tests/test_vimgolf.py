@@ -114,8 +114,8 @@ class TestVimgolf(unittest.TestCase):
             # "But when a backslash occurs before a special character (space, comma, backslash, etc.),
             # Vim removes the backslash."
             play_specs.append(PlaySpec('', '"\\', 'i"\\<esc>ZZ', True))
-            # The following test fails on Windows, without hanging. The backslash does not show up as
-            # executed keys.
+            # The following test fails on Windows (only under GitHub Actions), without hanging. The
+            # backslash does not show up as executed keys.
             # > Here are your keystrokes: ia"bc<Esc>ZZ
             play_specs.append(PlaySpec('', 'a"b\\c', 'ia"b\\c<esc>ZZ', True))
 
