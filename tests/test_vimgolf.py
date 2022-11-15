@@ -105,7 +105,7 @@ class TestVimgolf(unittest.TestCase):
             # PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
             # PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
             # PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
-            PlaySpec('', '"\\', 'i"\\<esc>ZZ', True),
+            PlaySpec('', '"\\', 'i"<esc>ZZ', True),
         ]
         for play_spec in play_specs:
             challenge = Challenge(
