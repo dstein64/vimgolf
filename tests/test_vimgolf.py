@@ -105,11 +105,15 @@ class TestVimgolf(unittest.TestCase):
             PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
             PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
             PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
-            PlaySpec('', 'a"b\\', 'ia"b\\<esc>ZZ', True),
+            PlaySpec('', 'a"b\\c', 'ia"b\\c<esc>ZZ', True),
         ]
         if sys.platform != 'win32' or 'GITHUB_ACTIONS' not in os.environ:
             # The following test hangs under GitHub Actions on Windows (but not on a direct test on
             # a Windows machine). The issue does not occur without the backslash entry in init_keys.
+            # A test above also uses backslash without issue. The problem may be related to using
+            # a backslash prior to <esc>. Perhaps this relates to the note under ":help dos-backslash":
+            # "But when a backslash occurs before a special character (space, comma, backslash, etc.),
+            # Vim removes the backslash."
             play_specs.append(PlaySpec('', '"\\', 'i"\\<esc>ZZ', True))
         for play_spec in play_specs:
             challenge = Challenge(
