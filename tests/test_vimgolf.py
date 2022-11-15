@@ -141,7 +141,13 @@ class TestVimgolf(unittest.TestCase):
             self.assertEqual(status, Status.SUCCESS)
             self.assertEqual(results[-1].correct, play_spec.correct)
             self.assertEqual(len(results), 1)
-            self.assertEqual(results[-1].score, len(tokenize_keycode_reprs(play_spec.init_keys)))
+            expected_score = len(tokenize_keycode_reprs(play_spec.init_keys))
+            if (win_github_actions
+                    and not results[-1].correct
+                    and '\\' in play_spec.init_keys):
+                # Account for backslash getting dropped on GitHub Actions on Windows.
+                expected_score -= play_spec.init_keys.count('\\')
+            self.assertEqual(results[-1].score, expected_score)
 
 
 if __name__ == '__main__':
