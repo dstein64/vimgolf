@@ -105,6 +105,7 @@ class TestVimgolf(unittest.TestCase):
             PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
             PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
             PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
+            PlaySpec('', 'a"b\\', 'ia"b\\<esc>ZZ', True),
         ]
         if sys.platform != 'win32' or 'GITHUB_ACTIONS' not in os.environ:
             # The following test hangs under GitHub Actions on Windows (but not on a direct test on
