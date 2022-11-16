@@ -530,7 +530,8 @@ def play(challenge, results=None):
 
             # list of parsed keycode byte strings
             keycodes = parse_keycodes(raw_keys)
-            # Drop <c-c><c-c> (Vim #11541). Skip the init keys, since the issue is not present for feedkeys().
+            # Replace <C-C><C-C> with <C-C> (Vim #11541). Skip the init keys, since the issue is not
+            # present for feedkeys().
             keycodes = replace_double_ctrl_c(keycodes, len(init_reprs))
             keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
 
