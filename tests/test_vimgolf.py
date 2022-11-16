@@ -109,7 +109,7 @@ class TestVimgolf(unittest.TestCase):
             PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
             PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
             PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
-            # Make sure double <c-c>, specified as init keys, doesn't get dropped (the score
+            # Make sure double <c-c>, specified as init keys, doesn't get replaced (the score
             # should be 4, which is tested).
             PlaySpec('', 'hello world', '<c-c><c-c>ZZ', False),
         ]
