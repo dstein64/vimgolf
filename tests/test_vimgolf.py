@@ -11,7 +11,11 @@ from vimgolf.html import (
     get_text,
     parse_html,
 )
-from vimgolf.keys import tokenize_keycode_reprs
+from vimgolf.keys import (
+    replace_double_ctrl_c,
+    get_keycode_repr,
+    tokenize_keycode_reprs,
+)
 from vimgolf.vimgolf import (
     Challenge,
     format_,
@@ -105,6 +109,9 @@ class TestVimgolf(unittest.TestCase):
             PlaySpec('hello world', 'hello', 'A<bs><bs><bs><bs><bs><esc>ZZ', False),
             PlaySpec('hello world', 'hllo world', '<space><Space>i<bs><Esc>XZZ', True),
             PlaySpec('hello world', 'hello\n\\|world', 'WXi<enter><bslash><BAR><Esc>ZZ', True),
+            # Make sure double <c-c>, specified as init keys, doesn't get dropped (the score
+            # should be 4, which is tested).
+            PlaySpec('', 'hello world', '<c-c><c-c>ZZ', False),
         ]
         win_github_actions = sys.platform == 'win32' and 'GITHUB_ACTIONS' in os.environ
         if not win_github_actions:
@@ -148,6 +155,59 @@ class TestVimgolf(unittest.TestCase):
                 # Account for backslash getting dropped on GitHub Actions on Windows.
                 expected_score -= play_spec.init_keys.count('\\')
             self.assertEqual(results[-1].score, expected_score)
+
+    def test_replace_double_ctrl_c(self):
+        ctrl_c = b'\x00\x03'
+        self.assertEqual(get_keycode_repr(ctrl_c), '<C-C>')
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [b'\x00d', b'\x00W', b'\x00Z', b'\x00Z']),
+                [b'\x00d', b'\x00W', b'\x00Z', b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z']),
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z']),
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z', ctrl_c]),
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z', ctrl_c])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z', ctrl_c, ctrl_c]),
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z', ctrl_c])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z']),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00W', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z']),
+                [ctrl_c, b'\x00d', b'\x00W', b'\x00Z', ctrl_c, ctrl_c, b'\x00Z'])
+        # Make sure the optional start argument works as expected.
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'], 1),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'], 2),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'], 4),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'], 5),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, b'\x00Z'])
+        self.assertEqual(
+            replace_double_ctrl_c(
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'], 6),
+                [ctrl_c, ctrl_c, b'\x00d', b'\x00Z', ctrl_c, ctrl_c, ctrl_c, b'\x00Z'])
 
 
 if __name__ == '__main__':

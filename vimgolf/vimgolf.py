@@ -26,6 +26,7 @@ from vimgolf.html import (
     parse_html,
 )
 from vimgolf.keys import (
+    replace_double_ctrl_c,
     get_keycode_repr,
     IGNORED_KEYSTROKES,
     parse_keycodes,
@@ -484,9 +485,9 @@ def play(challenge, results=None):
             # while the script read with "-s scriptin" expects escape codes").
             # The conversion is conducted here so that we can fail fast on
             # error (prior to playing) and to avoid repeated computation.
-            keycode_reprs = tokenize_keycode_reprs(challenge.init_keys)
+            init_reprs = tokenize_keycode_reprs(challenge.init_keys)
             init_feedkeys = []
-            for item in keycode_reprs:
+            for item in init_reprs:
                 if item == '\\':
                     item = '\\\\'  # Replace '\' with '\\'
                 elif item == '"':
@@ -529,6 +530,8 @@ def play(challenge, results=None):
 
             # list of parsed keycode byte strings
             keycodes = parse_keycodes(raw_keys)
+            # Drop <c-c><c-c> (Vim #11541). Skip the init keys, since the issue is not present for feedkeys().
+            keycodes = replace_double_ctrl_c(keycodes, len(init_reprs))
             keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
 
             # list of human-readable key strings

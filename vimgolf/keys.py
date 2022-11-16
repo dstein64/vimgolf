@@ -68,6 +68,22 @@ def parse_keycodes(raw_keys):
     return keycodes
 
 
+def replace_double_ctrl_c(parsed_keycodes, start=0):
+    """
+    Replace double entries of b'\x00\x03' (<c-c>) with a single entry,
+    starting at the specified location.
+    """
+    idx = start + 1
+    skip = set()
+    while idx < len(parsed_keycodes):
+        if parsed_keycodes[idx] == parsed_keycodes[idx - 1] == b'\x00\x03':
+            skip.add(idx)
+            idx += 1
+        idx += 1
+    keycodes = [x for idx, x in enumerate(parsed_keycodes) if idx not in skip]
+    return keycodes
+
+
 # keystrokes that should not impact score (e.g., window focus)
 IGNORED_KEYSTROKES = {
     b'\xfd\x35', # (35) KE_IGNORE
