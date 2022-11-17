@@ -507,14 +507,14 @@ def play(challenge, results=None):
 
             vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
             play_args = [
-                '-Z',          # restricted mode, utilities not allowed
-                '-n',          # no swap file, memory only editing
-                '--noplugin',  # no plugins
-                '-i', 'NONE',  # don't load .viminfo (e.g., has saved macros, etc.)
-                '+0',          # start on line 0
-                '-u', vimrc,   # vimgolf .vimrc
-                '-U', 'NONE',  # don't load .gvimrc
-                '-W', logfile, # keylog file (overwrites existing)
+                '-Z',           # restricted mode, utilities not allowed
+                '-n',           # no swap file, memory only editing
+                '--noplugin',   # no plugins
+                '-i', 'NONE',   # don't load .viminfo (e.g., has saved macros, etc.)
+                '+0',           # start on line 0
+                '-u', vimrc,    # vimgolf .vimrc
+                '-U', 'NONE',   # don't load .gvimrc
+                '-W', logfile,  # keylog file (overwrites existing)
                 '+call feedkeys("{}", "t")'.format(init_feedkeys),  # initial keys
                 infile,
             ]
