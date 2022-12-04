@@ -26,6 +26,13 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
         python-version: ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10']
+        exclude:
+          # Python 3.5 and 3.6 are not supported on GitHub hosted runners as of Ubuntu 22.04.
+          # https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+          - os: ubuntu-latest
+            python-version: '3.5'
+          - os: ubuntu-latest
+            python-version: '3.6'
 
     steps:
     - name: Checkout
