@@ -2,7 +2,6 @@ from collections import namedtuple
 import concurrent.futures
 import contextlib
 import datetime
-from distutils.version import StrictVersion
 from enum import Enum
 import filecmp
 import glob
@@ -295,6 +294,34 @@ def working_directory(directory):
         yield
     finally:
         os.chdir(existing)
+
+
+class Version:
+    """A class for version comparisons."""
+
+    def __init__(self, str):
+        version = re.sub(r'(\.0+)*$', '', str)  # remove trailing '.0+' occurrences
+        version = version.split('.')            # split
+        version = [int(x) for x in version]     # convert strings to ints
+        self._version = version
+
+    def __lt__(self, other):
+        return self._version < other._version
+
+    def __le__(self, other):
+        return self._version <= other._version
+
+    def __eq__(self, other):
+        return self._version == other._version
+
+    def __ne__(self, other):
+        return self._version != other._version
+
+    def __gt__(self, other):
+        return self._version > other._version
+
+    def __ge__(self, other):
+        return self._version >= other._version
 
 
 # ************************************************************
@@ -647,8 +674,8 @@ def put(challenge_id, init_keys=''):
             write('Uploading to vimgolf.com is disabled', stream=sys.stderr, color='red')
             write('vimgolf may not function properly', color='red')
             try:
-                client_compliance_version = StrictVersion(RUBY_CLIENT_VERSION_COMPLIANCE)
-                api_version = StrictVersion(challenge_spec['client'])
+                client_compliance_version = Version(RUBY_CLIENT_VERSION_COMPLIANCE)
+                api_version = Version(challenge_spec['client'])
                 action = 'upgrade' if api_version > client_compliance_version else 'downgrade'
             except Exception:
                 action = 'update'
