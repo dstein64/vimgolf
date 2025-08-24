@@ -531,7 +531,8 @@ def play(challenge, results=None):
         while True:
             with open(infile, 'w') as f:
                 f.write(challenge.in_text)
-
+            with open(outfile, 'w') as f:
+                f.write(challenge.out_text)
             vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
             play_args = [
                 '-Z',           # restricted mode, utilities not allowed
@@ -587,6 +588,10 @@ def play(challenge, results=None):
             while True:
                 # Generate the menu items inside the loop since it can change across iterations
                 # (e.g., upload option can be removed)
+                with open(infile, 'w') as f:
+                    f.write(challenge.in_text)
+                with open(outfile, 'w') as f:
+                    f.write(challenge.out_text)
                 menu = []
                 if not correct:
                     menu.append(('d', 'Show diff'))
