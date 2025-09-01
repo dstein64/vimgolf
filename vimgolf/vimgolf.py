@@ -496,12 +496,7 @@ def play(challenge, results=None):
         infile = 'in'
         if challenge.in_extension:
             infile += challenge.in_extension
-        outfile = 'out'
-        if challenge.out_extension:
-            outfile += challenge.out_extension
         logfile = 'log'
-        with open(outfile, 'w') as f:
-            f.write(challenge.out_text)
 
         try:
             # If there were init keys specified, we need to convert them to a
@@ -531,8 +526,7 @@ def play(challenge, results=None):
         while True:
             with open(infile, 'w') as f:
                 f.write(challenge.in_text)
-            with open(outfile, 'w') as f:
-                f.write(challenge.out_text)
+
             vimrc = os.path.join(os.path.dirname(__file__), 'vimgolf.vimrc')
             play_args = [
                 '-Z',           # restricted mode, utilities not allowed
@@ -549,7 +543,8 @@ def play(challenge, results=None):
             if VimRunner.run(play_args) != Status.SUCCESS:
                 return Status.FAILURE
 
-            correct = filecmp.cmp(infile, outfile, shallow=False)
+            with open(infile, 'r') as f:
+                correct = f.read() == challenge.out_text
             logger.info('correct: %s', str(correct).lower())
             with open(logfile, 'rb') as _f:
                 # raw keypress representation saved by vim's -w
@@ -588,10 +583,6 @@ def play(challenge, results=None):
             while True:
                 # Generate the menu items inside the loop since it can change across iterations
                 # (e.g., upload option can be removed)
-                with open(infile, 'w') as f:
-                    f.write(challenge.in_text)
-                with open(outfile, 'w') as f:
-                    f.write(challenge.out_text)
                 menu = []
                 if not correct:
                     menu.append(('d', 'Show diff'))
@@ -606,9 +597,16 @@ def play(challenge, results=None):
                 if selection not in valid_codes:
                     write('Invalid selection: {}'.format(selection), stream=sys.stderr, color='red')
                 elif selection == 'd':
+                    outfile = 'out'
+                    if challenge.out_extension:
+                        outfile += challenge.out_extension
+                    with open(outfile, 'w') as f:
+                        f.write(challenge.out_text)
                     # diffsplit is used instead of 'vim -d' to avoid the "2 files to edit" message.
                     diff_args = ['-n', outfile, '-c', 'vertical diffsplit {}'.format(infile)]
-                    if VimRunner.run(diff_args) != Status.SUCCESS:
+                    diff_status = VimRunner.run(diff_args)
+                    os.remove(outfile)
+                    if diff_status != Status.SUCCESS:
                         return Status.FAILURE
                 elif selection == 'w':
                     upload_status = upload_result(challenge.id, challenge.api_key, raw_keys)
