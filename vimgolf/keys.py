@@ -76,6 +76,7 @@ IGNORED_KEYSTROKES = {
     b'\xfd\x61', # (97) KE_NOP
     b'\xfd\x62', # (98) KE_FOCUSGAINED Focus Gained (GVIM)
     b'\xfd\x63', # (99) KE_FOCUSLOST Focus Lost (GVIM)
+    b'\xfd\x6d', # (109) KE_OSC
 }
 
 _KEYCODE_REPR_LOOKUP = {}
