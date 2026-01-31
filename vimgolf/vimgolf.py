@@ -3,7 +3,6 @@ import concurrent.futures
 import contextlib
 import datetime
 from enum import Enum
-import filecmp
 import glob
 import json
 import logging
