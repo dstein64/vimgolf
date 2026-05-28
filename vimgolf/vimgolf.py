@@ -1,7 +1,7 @@
 from collections import namedtuple
 import concurrent.futures
 import contextlib
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from enum import Enum
 import glob
 import json
@@ -80,7 +80,7 @@ EXPANSION_PREFIX = '+'
 
 USER_HOME = os.path.expanduser('~')
 
-TIMESTAMP = datetime.now(UTC).timestamp()
+TIMESTAMP = datetime.now(timezone.utc).timestamp()
 
 # Max number of listings by default for 'vimgolf list'
 LISTING_LIMIT = 10
