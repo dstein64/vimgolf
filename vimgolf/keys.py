@@ -46,15 +46,16 @@ class Trie:
 # ************************************************************
 
 # Vim records key presses using 1) a single byte or 2) a 0x80 byte
-# followed by two bytes. Parse the single-bytes and double-bytes.
-# For the returned list, all values are represented with two bytes
-# (single bytes are padded).
-def parse_keycodes(raw_keys):
+# followed by two bytes.
+def scan_keys(raw_keys, ignore=None):
     """
-    Parse list of keypress bytes from raw keypress representation saved
-    by vim's -w.
+    Scan the raw keypress representation saved by vim's -w, excluding the specified
+    keystrokes. Returns a tuple (keycodes, raw_keys) containing keycodes normalized
+    to two bytes (single bytes are padded), alongside the corresponding retained
+    raw keys.
     """
     keycodes = []
+    kept_raw = bytearray()
     tmp = list(reversed(raw_keys))
     while tmp:
         b0 = tmp.pop()
@@ -62,10 +63,15 @@ def parse_keycodes(raw_keys):
             b1 = tmp.pop()
             b2 = tmp.pop()
             keycode = bytes((b1, b2))
+            raw = bytes((b0, b1, b2))
         else:
             keycode = to_bytes(b0)
+            raw = bytes((b0,))
+        if ignore is not None and keycode in ignore:
+            continue
         keycodes.append(keycode)
-    return keycodes
+        kept_raw.extend(raw)
+    return keycodes, bytes(kept_raw)
 
 
 # keystrokes that should not impact score (e.g., window focus)

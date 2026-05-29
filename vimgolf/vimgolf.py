@@ -26,7 +26,7 @@ from vimgolf.html import (
 from vimgolf.keys import (
     get_keycode_repr,
     IGNORED_KEYSTROKES,
-    parse_keycodes,
+    scan_keys,
     tokenize_keycode_reprs,
 )
 
@@ -549,9 +549,7 @@ def play(challenge, results=None):
                 # raw keypress representation saved by vim's -w
                 raw_keys = _f.read()
 
-            # list of parsed keycode byte strings
-            keycodes = parse_keycodes(raw_keys)
-            keycodes = [keycode for keycode in keycodes if keycode not in IGNORED_KEYSTROKES]
+            keycodes, raw_keys = scan_keys(raw_keys, IGNORED_KEYSTROKES)
 
             # list of human-readable key strings
             keycode_reprs = [get_keycode_repr(keycode) for keycode in keycodes]
